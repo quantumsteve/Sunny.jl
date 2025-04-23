@@ -20,6 +20,8 @@ import Spglib
 import RowEchelon: rref!
 import Brillouin
 
+import CUDA
+
 include("MathBasics.jl")
 
 include("Operators/Spin.jl")
