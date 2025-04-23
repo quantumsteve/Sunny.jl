@@ -169,6 +169,8 @@ res = powder_average(cryst, radii, 2000) do qs
 end
 plot_intensities(res; units, saturation=1.0, title="CoRh₂O₄ Powder Average")
 
+a = intensities_bands(swt, path)
+println(a.disp[1,:])
 # This result can be compared to experimental neutron scattering data
 # from Fig. 5 of [Ge et al.](https://doi.org/10.1103/PhysRevB.96.064413)
 # ```@raw html

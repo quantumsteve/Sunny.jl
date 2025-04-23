@@ -54,6 +54,43 @@ function bogoliubov!(T::Matrix{ComplexF64}, H::Matrix{ComplexF64})
     return energies
 end
 
+function normalize_columns(λ, T)
+    i = CUDA.threadIdx().x
+    c = CUDA.rsqrt(CUDA.abs(λ[i]))
+    view(T, :, i) .*= c
+    return
+end
+
+# Bogoliubov transformation that diagonalizes a quadratic bosonic Hamiltonian,
+# allowing for anomalous terms. The general procedure derives from Colpa,
+# Physica A, 93A, 327-353 (1978). Overwrites data in H.
+function bogoliubov!(T_d::CUDA.CuArray{ComplexF64}, H_d::CUDA.CuArray{ComplexF64}, p_d::CUDA.CuArray{Int})
+    L = div(size(H_d, 1), 2)
+    @assert size(T_d) == size(H_d) == (2L, 2L)
+
+    # Initialize T to the para-unitary identity Ĩ = diagm([ones(L), -ones(L)])
+    T_d .= 0
+    T_d[diagind(T_d)[1:L]] .= 1
+    T_d[diagind(T_d)[L+1:2L]] .= -1
+
+    # Solve generalized eigenvalue problem, Ĩ t = λ H t, for columns t of T.
+    # Eigenvalues are sorted such that positive values appear first, and are
+    # otherwise ascending in absolute value.
+    sortby(x) = (-sign(x), abs(x))
+    λ_d, T0_d = eigen!(Hermitian(T_d), Hermitian(H_d))
+    sortperm!(p_d, λ_d; by=sortby)
+    permute!(λ_d, p_d)
+
+    # Note that T0 and T refer to the same data.
+    @assert T0_d === T_d
+
+    # Normalize columns of T so that para-unitarity holds, T† Ĩ T = Ĩ.
+    CUDA.@cuda threads=length(λ_d) normalize_columns(λ_d, T_d)
+
+    # Inverse of λ are eigenvalues of Ĩ H, or equivalently, of √H Ĩ √H.
+    energies = 1 ./ λ_d
+    return energies
+end
 
 # Returns |1 + nB(ω)| where nB(ω) = 1 / (exp(βω) - 1) is the Bose function.
 # Equivalent to |1 / expm1(-βω)| where expm1(x) = e^x-1.
@@ -100,6 +137,23 @@ function excitations!(T, tmp, swt::SpinWaveTheory, q)
     catch _
         rethrow(ErrorException("Not an energy-minimum; wavevector q = $q unstable."))
     end
+end
+
+function excitations!(T, tmp, p, swt::SpinWaveTheory, q)
+    L = nbands(swt)
+    size(T) == size(tmp) == (2L, 2L) || error("Arguments T and tmp must be $(2L)×$(2L) matrices")
+
+    q_reshaped = to_reshaped_rlu(swt.sys, q)
+    dynamical_matrix!(tmp, swt, q_reshaped)
+
+    T_d = CUDA.CuArray(T)
+    tmp_d = CUDA.CuArray(tmp)
+    p_d = CUDA.CuArray(p)
+    energies_d = bogoliubov!(T_d, tmp_d, p_d)
+    energies = Array(energies_d)
+    T .= Array(T_d)
+    p .= Array(p_d)
+    return energies
 end
 
 """
@@ -171,10 +225,11 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
     Avec_pref = zeros(ComplexF64, Nobs, Na)
     disp = zeros(Float64, L, Nq)
     intensity = zeros(eltype(measure), L, Nq)
+    p = zeros(Int,2L)
 
     for (iq, q) in enumerate(qpts.qs)
         q_global = cryst.recipvecs * q
-        view(disp, :, iq) .= view(excitations!(T, H, swt, q), 1:L)
+        view(disp, :, iq) .= view(excitations!(T, H, p, swt, q), 1:L)
 
         for i in 1:Na, μ in 1:Nobs
             r_global = global_position(sys, (1, 1, 1, i)) # + offsets[μ, i]
@@ -191,7 +246,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
             if sys.mode == :SUN
                 data = swt.data::SWTDataSUN
                 N = sys.Ns[1]
-                t = reshape(view(T, :, band), N-1, Na, 2)
+                t = reshape(view(T, :, p[band]), N-1, Na, 2)
                 for i in 1:Na, μ in 1:Nobs
                     O = data.observables_localized[μ, i]
                     for α in 1:N-1
@@ -201,7 +256,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
             else
                 @assert sys.mode in (:dipole, :dipole_uncorrected)
                 data = swt.data::SWTDataDipole
-                t = reshape(view(T, :, band), Na, 2)
+                t = reshape(view(T, :, p[band]), Na, 2)
                 for i in 1:Na, μ in 1:Nobs
                     O = data.observables_localized[μ, i]
                     # This is the Avec of the two transverse and one
