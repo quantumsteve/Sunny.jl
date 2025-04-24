@@ -76,16 +76,17 @@ function bogoliubov!(T_d::CUDA.CuArray{ComplexF64}, H_d::CUDA.CuArray{ComplexF64
     # Solve generalized eigenvalue problem, Ĩ t = λ H t, for columns t of T.
     # Eigenvalues are sorted such that positive values appear first, and are
     # otherwise ascending in absolute value.
-    sortby(x) = (-sign(x), abs(x))
     λ_d, T0_d = eigen!(Hermitian(T_d), Hermitian(H_d))
-    sortperm!(p_d, λ_d; by=sortby)
-    permute!(λ_d, p_d)
 
     # Note that T0 and T refer to the same data.
     @assert T0_d === T_d
 
     # Normalize columns of T so that para-unitarity holds, T† Ĩ T = Ĩ.
     CUDA.@cuda threads=length(λ_d) normalize_columns(λ_d, T_d)
+
+    sortby(x) = (-sign(x), abs(x))
+    sortperm!(p_d, λ_d; by=sortby)
+    permute!(λ_d, p_d)
 
     # Inverse of λ are eigenvalues of Ĩ H, or equivalently, of √H Ĩ √H.
     energies = 1 ./ λ_d
