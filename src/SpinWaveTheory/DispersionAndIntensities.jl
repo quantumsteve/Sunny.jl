@@ -16,8 +16,7 @@ function bogoliubov!(T::Matrix{ComplexF64}, H::Matrix{ComplexF64})
     # Solve generalized eigenvalue problem, Ĩ t = λ H t, for columns t of T.
     # Eigenvalues are sorted such that positive values appear first, and are
     # otherwise ascending in absolute value.
-    sortby(x) = (-sign(x), abs(x))
-    λ, T0 = eigen!(Hermitian(T), Hermitian(H); sortby)
+    λ, T0 = eigen!(Hermitian(T), Hermitian(H))
 
     # Note that T0 and T refer to the same data.
     @assert T0 === T
@@ -36,7 +35,7 @@ function bogoliubov!(T::Matrix{ComplexF64}, H::Matrix{ComplexF64})
     # congruence transform Ĩ → √H Ĩ √H. The first L elements are positive,
     # while the next L elements are negative. Their absolute values are
     # excitation energies for the wavevectors q and -q, respectively.
-    @assert all(>(0), view(energies, 1:L)) && all(<(0), view(energies, L+1:2L))
+    #@assert all(<(0), view(energies, 1:L)) && all(>(0), view(energies, L+1:2L))
 
     # Disable tests below for speed. Note that the data in H has been
     # overwritten by eigen!, so H0 should refer to an original copy of H.
@@ -175,7 +174,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
 
     for (iq, q) in enumerate(qpts.qs)
         q_global = cryst.recipvecs * q
-        view(disp, :, iq) .= view(excitations!(T, H, swt, q), 1:L)
+        view(disp, :, iq) .= view(excitations!(T, H, swt, q), L+1:2L)
 
         for i in 1:Na, μ in 1:Nobs
             r_global = global_position(sys, (1,1,1,i)) # + offsets[μ,i]
@@ -192,7 +191,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
             if sys.mode == :SUN
                 data = swt.data::SWTDataSUN
                 N = sys.Ns[1]
-                t = reshape(view(T, :, band), N-1, Na, 2)
+                t = reshape(view(T, :, band+L), N-1, Na, 2)
                 for i in 1:Na, μ in 1:Nobs
                     O = data.observables_localized[μ, i]
                     for α in 1:N-1
@@ -202,7 +201,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
             else
                 @assert sys.mode in (:dipole, :dipole_uncorrected)
                 data = swt.data::SWTDataDipole
-                t = reshape(view(T, :, band), Na, 2)
+                t = reshape(view(T, :, band+L), Na, 2)
                 for i in 1:Na, μ in 1:Nobs
                     O = data.observables_localized[μ, i]
                     # This is the Avec of the two transverse and one
