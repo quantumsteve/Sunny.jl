@@ -119,6 +119,15 @@ function dynamical_matrix!(H, swt::SpinWaveTheory, q_reshaped)
     end
 end
 
+function dynamical_matrix_cuda!(H, swt::SpinWaveTheory, q_reshaped)
+    if swt.sys.mode == :SUN
+        swt_hamiltonian_SUN!(H, swt, q_reshaped)
+    else
+        @assert swt.sys.mode in (:dipole, :dipole_uncorrected)
+        swt_hamiltonian_dipole!(H, swt, q_reshaped)
+    end
+end
+
 function mul_dynamical_matrix(swt, x, qs_reshaped)
     y = zero(x)
     mul_dynamical_matrix!(swt, y, x, qs_reshaped)
