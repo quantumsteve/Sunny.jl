@@ -1,3 +1,6 @@
+using CUDA
+using CUDA: i32
+
 # Set the dynamical quadratic Hamiltonian matrix in dipole mode. 
 function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
     (; sys, data) = swt
@@ -156,6 +159,58 @@ function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_r
     end
 end
 
+function fill_matrix(H11, H12, H21, H22, gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
+    i = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
+    coupling = int_pair[i]
+
+    # Zeeman term
+    B = gs[1, 1, 1, i]' * extfield[1, 1, 1, i]
+    B′ = - dot(B, local_rotations[i][:, 3])
+    H11[i, i] += B′
+    H22[i, i] += B′
+
+    # Single-ion anisotropy
+    (; c2, c4, c6) = stevens_coefs[i]
+    s = sqrtS[i]^2
+    A1 = -6s*c2[3] - 80*s^3*c4[5] - 336*s^5*c6[7]
+    A2 = 2s*(c2[1]+im*c2[5]) + 12s^3*(c4[3]+im*c4[7]) + 32s^5*(c6[5]+im*c6[9])
+    H11[i, i] += A1
+    H22[i, i] += A1
+    H12[i, i] += A2
+    H21[i, i] += conj(A2)
+
+    # Pair interactions
+    for coupling in int.pair
+    end
+    return nothing
+end
+
+function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
+    println("dipole")
+
+    (; sys, data) = swt
+    (; local_rotations, stevens_coefs, sqrtS) = data
+    (; extfield, gs) = sys
+
+    L = nbands(swt)
+    @assert size(H) == (2L, 2L)
+
+    # Initialize Hamiltonian buffer 
+    # Note that H11 for b†b, H22 for bb†, H12 for b†b†, and H21 for bb
+    H .= 0.0 
+    H11 = view(H, 1:L, 1:L)
+    H12 = view(H, 1:L, L+1:2L)
+    H21 = view(H, L+1:2L, 1:L)
+    H22 = view(H, L+1:2L, L+1:2L)
+
+    extfield_d = CUDA.CuArray(extfield)
+    gs_d = CUDA.CuArray(gs)
+    local_rotations_d = CUDA.CuArray(local_rotations)
+    stevens_coefs_d = CUDA.CuArray(stevens_coefs)
+    sqrtS_d = CUDA.CuArray(sqrtS)
+    int_pair_d = CUDA.CuArray(sys.interactions_union.pair)
+    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, gs_d, extfield_d, local_rotations_d, stevens_coefs_d, sqrtS_d, int_pair_d) 
+end
 
 
 function multiply_by_hamiltonian_dipole!(y::AbstractMatrix{ComplexF64}, x::AbstractMatrix{ComplexF64}, swt::SpinWaveTheory, qs_reshaped::Vector{Vec3};

@@ -129,6 +129,9 @@ function swt_hamiltonian_SUN!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_resh
     end
 end
 
+function swt_hamiltonian_SUN!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
+println("SUN")
+end
 
 # Calculate y = H*x, where H is the quadratic Hamiltonian matrix (dynamical
 # matrix). Note that x is assumed to be a 2D array with first index
