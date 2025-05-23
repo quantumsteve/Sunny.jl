@@ -4,6 +4,7 @@ authors = ["The Sunny team"]
 version = "0.7.6"
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Brillouin = "23470ee3-d0df-4052-8b1a-8cbd6363e7f0"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CrystalInfoFramework = "6007d9b0-c6b2-11e8-0510-1d10e825f3f1"
@@ -38,9 +39,10 @@ PlottingExt = "Makie"
 WGLMakiePrecompilesExt = ["Makie", "WGLMakie"]
 
 [compat]
+Adapt = "4.3.0"
 Brillouin = "0.5.19"
-CrystalInfoFramework = "0.8, 1"
 CUDA = "5.7.2"
+CrystalInfoFramework = "0.8, 1"
 DynamicPolynomials = "0.6.0"
 ElasticArrays = "1.2.12"
 FFTW = "1.4.5"

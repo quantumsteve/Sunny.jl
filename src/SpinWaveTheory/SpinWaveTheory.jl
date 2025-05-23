@@ -5,10 +5,36 @@ struct SWTDataDipole
     sqrtS                 :: Vector{Float64}          # Square root of spin magnitudes
 end
 
+struct SWTDataDipoleDevice
+    local_rotations  # Rotations from global to quantization frame
+    stevens_coefs    # Rotated onsite coupling as Steven expansion
+    sqrtS            # Square root of spin magnitudes
+end
+
+function Adapt.adapt_structure(to, data::SWTDataDipole)
+    local_rotations = Adapt.adapt_structure(to, data.local_rotations)
+    stevens_coefs = Adapt.adapt_structure(to, data.stevens_coefs)
+    sqrtS = Adapt.adapt_structure(to, data.sqrtS)
+    SWTDataDipoleDevice(local_rotations, stevens_coefs, sqrtS)
+end
+ 
 struct SWTDataSUN
     local_unitaries       :: Vector{Matrix{ComplexF64}} # Transformations from global to quantization frame
     observables_localized :: Array{HermitianC64, 2}     # Observables rotated to local frame (nobs × nsites)
     spins_localized       :: Array{HermitianC64, 2}     # Spins rotated to local frame (3 × nsites)
+end
+
+struct SWTDataSUNDevice
+    local_unitaries # Transformations from global to quantization frame
+    observables_localized # Observables rotated to local frame (nobs × nsites)
+    spins_localized # Spins rotated to local frame (3 × nsites)
+end
+
+function Adapt.adapt_structure(to, data::SWTDataSUN)
+    local_unitaries = Adapt.adapt_structure(to, data.local_unitaries)
+    observables_localized = Adapt.adapt_structure(to, data.observables_localized)
+    spins_localized = Adapt.adapt_structure(to, data.spins_localized)
+    SWTDataSUNDevice(local_unitaries, observables_localized, spins_localized)
 end
 
 # To facilitate sharing some code with SpinWaveTheorySpiral
@@ -35,6 +61,25 @@ struct SpinWaveTheory <: AbstractSpinWaveTheory
     measure        :: MeasureSpec
     regularization :: Float64
 end
+
+struct SpinWaveTheoryDevice
+    sys
+    data
+end
+
+function Adapt.adapt_structure(to, swt::SpinWaveTheory)
+    sys = Adapt.adapt_structure(to, swt.sys)
+    data = Adapt.adapt_structure(to, swt.data)
+    SpinWaveTheoryDevice(sys, data)
+end
+
+#function Adapt.adapt_structure(to, swt::SpinWaveTheory::System)
+#    sys = Adapt.adapt_structure(to, swt.sys)
+#    data = Adapt.adapt_structure(to, swt.data)
+#    measure = Adapt.adapt_structure(to, swt.measure)
+#    regularization = Adapt.adapt_structure(to, swt.regularization)
+#    SpinWaveTheory(sys, data, measure, regularization)
+#end
 
 function SpinWaveTheory(sys::System; measure::Union{Nothing, MeasureSpec}, regularization=1e-8, energy_ϵ=nothing)
     if !isnothing(energy_ϵ)
