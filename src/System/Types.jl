@@ -68,6 +68,17 @@ mutable struct Interactions
     pair :: Vector{PairCoupling}
 end
 
+struct InteractionsDevice
+    onsite
+    pair
+end
+
+function Adapt.adapt_structure(to, inter::Interactions)
+    onsite = Adapt.adapt_structure(to, inter.onsite)
+    pair = Adapt.adapt_structure(to, inter.pair)
+    InteractionsDevice(onsite, pair)
+end
+
 const rFTPlan = FFTW.rFFTWPlan{Float64, -1, false, 5, UnitRange{Int64}}
 const rBFTPlan = FFTW.rFFTWPlan{ComplexF64, 1, false, 5, UnitRange{Int64}}
 const rIFTPlan = FFTW.AbstractFFTs.ScaledPlan{ComplexF64, rBFTPlan, Float64}
@@ -115,4 +126,15 @@ mutable struct System{N}
 
     # Global data
     const rng              :: Random.Xoshiro
+end
+
+struct SystemDevice
+    extfield # External B field
+    gs # g-tensor per atom in unit cell
+end
+
+function Adapt.adapt_structure(to, sys::System{N})
+    extfield = Adapt.adapt_structure(to, sys.extfield)
+    gs = Adapt.adapt_structure(to, sys.gs)
+    SystemDevice(extfield, gs)
 end

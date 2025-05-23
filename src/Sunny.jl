@@ -21,6 +21,7 @@ import RowEchelon: rref!
 import Brillouin
 
 import CUDA
+import Adapt
 
 include("MathBasics.jl")
 

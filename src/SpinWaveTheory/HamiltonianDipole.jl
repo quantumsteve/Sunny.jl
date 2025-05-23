@@ -162,10 +162,10 @@ function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_r
     end
 end
 
-function fill_matrix(H11, H12, H21, H22, gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
+function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
     i = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
-    coupling = int_pair[i]
-
+    #=coupling = int_pair[i]
+    
     # Zeeman term
     B = gs[1, 1, 1, i]' * extfield[1, 1, 1, i]
     B′ = - dot(B, local_rotations[i][:, 3])
@@ -184,7 +184,7 @@ function fill_matrix(H11, H12, H21, H22, gs, extfield, local_rotations, stevens_
 
     # Pair interactions
     for coupling in int.pair
-    end
+    end=#
     return nothing
 end
 
@@ -206,13 +206,13 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     H21 = view(H, L+1:2L, 1:L)
     H22 = view(H, L+1:2L, L+1:2L)
 
-    extfield_d = CUDA.CuArray(extfield)
-    gs_d = CUDA.CuArray(gs)
-    local_rotations_d = CUDA.CuArray(local_rotations)
-    stevens_coefs_d = CUDA.CuArray(stevens_coefs)
-    sqrtS_d = CUDA.CuArray(sqrtS)
-    int_pair_d = CUDA.CuArray(sys.interactions_union.pair)
-    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, gs_d, extfield_d, local_rotations_d, stevens_coefs_d, sqrtS_d, int_pair_d) 
+    #extfield_d = CUDA.CuArray(extfield)
+    #gs_d = CUDA.CuArray(gs)
+    #local_rotations_d = CUDA.CuArray(local_rotations)
+    #stevens_coefs_d = CUDA.CuArray(stevens_coefs)
+    #sqrtS_d = CUDA.CuArray(sqrtS)
+    #int_pair_d = CUDA.CuArray(sys.interactions_union.pair)
+    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt) # gs_d, extfield_d, local_rotations_d, stevens_coefs_d, sqrtS_d, int_pair_d) 
 end
 
 
