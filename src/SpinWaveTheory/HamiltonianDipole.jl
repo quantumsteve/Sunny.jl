@@ -221,7 +221,7 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     println(typeof(swt_device.data.stevens_coefs), ' ',isbitstype(typeof(swt_device.data.stevens_coefs)))
     println(typeof(swt_device.data.sqrtS), ' ',isbitstype(typeof(swt_device.data.sqrtS)))
     isbitstype(CUDA.CuArray)
-    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device.data) # gs_d, extfield_d, local_rotations_d, stevens_coefs_d, sqrtS_d, int_pair_d) 
+    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device)
 end
 
 
