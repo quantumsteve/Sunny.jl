@@ -1,5 +1,6 @@
 using CUDA
 using CUDA: i32
+import Adapt
 
 # Set the dynamical quadratic Hamiltonian matrix in dipole mode. 
 function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
@@ -212,7 +213,18 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     #stevens_coefs_d = CUDA.CuArray(stevens_coefs)
     #sqrtS_d = CUDA.CuArray(sqrtS)
     #int_pair_d = CUDA.CuArray(sys.interactions_union.pair)
-    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt) # gs_d, extfield_d, local_rotations_d, stevens_coefs_d, sqrtS_d, int_pair_d) 
+
+    swt_device = SpinWaveTheoryDevice(swt)
+    println(typeof(swt_device), ' ', isbitstype(typeof(swt_device)))
+    println(typeof(swt_device.sys), ' ', isbitstype(typeof(swt_device.sys)))
+    println(typeof(swt_device.sys.extfield), ' ',isbitstype(typeof(swt_device.sys.extfield)))
+    println(typeof(swt_device.sys.gs), ' ',isbitstype(typeof(swt_device.sys.gs)))
+    println(typeof(swt_device.data), ' ',isbitstype(typeof(swt_device.data)))
+    println(typeof(swt_device.data.local_rotations), ' ',isbitstype(typeof(swt_device.data.local_rotations)))
+    println(typeof(swt_device.data.stevens_coefs), ' ',isbitstype(typeof(swt_device.data.stevens_coefs)))
+    println(typeof(swt_device.data.sqrtS), ' ',isbitstype(typeof(swt_device.data.sqrtS)))
+    isbitstype(CUDA.CuArray)
+    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device.data) # gs_d, extfield_d, local_rotations_d, stevens_coefs_d, sqrtS_d, int_pair_d) 
 end
 
 

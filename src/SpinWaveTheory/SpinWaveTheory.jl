@@ -6,18 +6,20 @@ struct SWTDataDipole
 end
 
 struct SWTDataDipoleDevice
-    local_rotations  # Rotations from global to quantization frame
-    stevens_coefs    # Rotated onsite coupling as Steven expansion
-    sqrtS            # Square root of spin magnitudes
+    local_rotations       :: AbstractVector{Mat3}             # Rotations from global to quantization frame
+    stevens_coefs         :: AbstractVector{StevensExpansion} # Rotated onsite coupling as Steven expansion
+    sqrtS                 :: AbstractVector{Float64}          # Square root of spin magnitudes
 end
 
-function Adapt.adapt_structure(to, data::SWTDataDipole)
+SWTDataDipoleDevice(host::SWTDataDipole) = SWTDataDipoleDevice(CUDA.CuVector(host.local_rotations), CUDA.CuVector(host.stevens_coefs), CUDA.CuVector(host.sqrtS))
+
+function Adapt.adapt_structure(to, data::SWTDataDipoleDevice)
     local_rotations = Adapt.adapt_structure(to, data.local_rotations)
     stevens_coefs = Adapt.adapt_structure(to, data.stevens_coefs)
     sqrtS = Adapt.adapt_structure(to, data.sqrtS)
     SWTDataDipoleDevice(local_rotations, stevens_coefs, sqrtS)
 end
- 
+
 struct SWTDataSUN
     local_unitaries       :: Vector{Matrix{ComplexF64}} # Transformations from global to quantization frame
     observables_localized :: Array{HermitianC64, 2}     # Observables rotated to local frame (nobs × nsites)
@@ -25,12 +27,14 @@ struct SWTDataSUN
 end
 
 struct SWTDataSUNDevice
-    local_unitaries # Transformations from global to quantization frame
-    observables_localized # Observables rotated to local frame (nobs × nsites)
-    spins_localized # Spins rotated to local frame (3 × nsites)
+    local_unitaries       :: AbstractVector{AbstractMatrix{ComplexF64}} # Transformations from global to quantization frame
+    observables_localized :: AbstractArray{HermitianC64Device, 2}      # Observables rotated to local frame (nobs × nsites)
+    spins_localized       :: AbstractArray{HermitianC64Device, 2}      # Spins rotated to local frame (3 × nsites)
 end
 
-function Adapt.adapt_structure(to, data::SWTDataSUN)
+SWTDataSUNDevice(host::SWTDataSUN) = SWTDataSUNDevice(CUDA.CuVector(host.local_unitaries), CUDA.CuArray(host.observables_localized), CUDA.CuArray(host.spins_localized))
+
+function Adapt.adapt_structure(to, data::SWTDataSUNDevice)
     local_unitaries = Adapt.adapt_structure(to, data.local_unitaries)
     observables_localized = Adapt.adapt_structure(to, data.observables_localized)
     spins_localized = Adapt.adapt_structure(to, data.spins_localized)
@@ -67,11 +71,13 @@ struct SpinWaveTheory <: AbstractSpinWaveTheory
 end
 
 struct SpinWaveTheoryDevice
-    sys
-    data
+    sys   :: SystemDevice
+    data  :: SWTDataDipoleDevice
 end
 
-function Adapt.adapt_structure(to, swt::SpinWaveTheory)
+SpinWaveTheoryDevice(host::SpinWaveTheory) = SpinWaveTheoryDevice(SystemDevice(host.sys), SWTDataDipoleDevice(host.data))
+
+function Adapt.adapt_structure(to, swt::SpinWaveTheoryDevice)
     sys = Adapt.adapt_structure(to, swt.sys)
     data = Adapt.adapt_structure(to, swt.data)
     SpinWaveTheoryDevice(sys, data)
