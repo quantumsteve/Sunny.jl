@@ -128,11 +128,13 @@ mutable struct System{N}
 end
 
 struct SystemDevice
-    extfield # External B field
-    gs # g-tensor per atom in unit cell
+    extfield :: AbstractArray{Vec3, 4} # External B field
+    gs       :: AbstractArray{Mat3, 4} # g-tensor per atom in unit cell
 end
 
-function Adapt.adapt_structure(to, sys::System{N})
+SystemDevice(host::System) = SystemDevice(CUDA.CuArray(host.extfield), CUDA.CuArray(host.gs))
+
+function Adapt.adapt_structure(to, sys::SystemDevice)
     extfield = Adapt.adapt_structure(to, sys.extfield)
     gs = Adapt.adapt_structure(to, sys.gs)
     SystemDevice(extfield, gs)
