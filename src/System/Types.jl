@@ -69,11 +69,13 @@ mutable struct Interactions
 end
 
 struct InteractionsDevice
-    onsite
-    pair
+    onsite  :: StevensExpansion
+    pair    :: AbstractVector{PairCoupling}
 end
 
-function Adapt.adapt_structure(to, inter::Interactions)
+InteractionsDevice(host::Interactions) = InteractionsDevice(host.onsite, CUDA.CUVector(host.pair))
+
+function Adapt.adapt_structure(to, inter::InteractionsDevice)
     onsite = Adapt.adapt_structure(to, inter.onsite)
     pair = Adapt.adapt_structure(to, inter.pair)
     InteractionsDevice(onsite, pair)
