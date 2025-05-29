@@ -164,13 +164,12 @@ function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_r
     end
 end
 
-function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
+function fill_matrix(H11, H12, H21, H22, swt, q_reshaped, L) # gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
     (; sys, data) = swt
     (; local_rotations, stevens_coefs, sqrtS) = data
     (; extfield, gs) = sys
 
     i = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
-    #k = (blockIdx().y - 1i32) * blockDim().y + threadIdx().y
 
     int = sys.interactions_union[i]
     # Zeeman term
@@ -190,10 +189,7 @@ function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, s
     H21[i, i] += conj(A2)
 
     # Pair interactions
-    # for coupling in int.pair
-    for k in 1:int.pair_length
-        coupling = int.pair[k]
-    #=
+    for coupling in int.pair
         (; isculled, bond) = coupling
         isculled && break
         (; i, j) = bond
@@ -252,14 +248,17 @@ function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, s
             H21[j, i] += P * conj(phase)
             H12[i, j] += conj(P) * phase
         end
-    =#
+    end
+
+    # Add small constant shift for positive-definiteness
+    for i in 1:L
+        H11[i, i] += swt.regularization
+        H22[i, i] += swt.regularization
     end
     return nothing
 end
 
 function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
-    println("dipole")
-
     L = nbands(swt)
     @assert size(H) == (2L, 2L)
 
@@ -272,27 +271,9 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     H22 = view(H, L+1:2L, L+1:2L)
 
     swt_device = SpinWaveTheoryDevice(swt)
-    CUDA.@allowscalar println(typeof(swt_device.sys.interactions_union[1].pair))
-    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device)
+    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device, q_reshaped, L)
 end
-#=
-function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
-    (; sys, data) = swt
-    (; local_rotations, stevens_coefs, sqrtS) = data
-    (; extfield, gs) = sys
 
-    L = nbands(swt)
-    @assert size(H) == (2L, 2L)
-
-    H .= 0.0 
-
-
-    for (i, int) in enumerate(sys.interactions_union)
-        println(i, ' ', CUDA.length(int.pair))
-        #for coupling in int.pair
-    end
-end    
-=#
 function multiply_by_hamiltonian_dipole!(y::AbstractMatrix{ComplexF64}, x::AbstractMatrix{ComplexF64}, swt::SpinWaveTheory, qs_reshaped::Vector{Vec3};
                                          phases=zeros(ComplexF64, size(qs_reshaped)))
     (; sys, data) = swt

@@ -73,14 +73,16 @@ end
 struct SpinWaveTheoryDevice{TSys, TData}
     sys   :: TSys
     data  :: TData
+    regularization :: Float64
 end
 
-SpinWaveTheoryDevice(host::SpinWaveTheory) = SpinWaveTheoryDevice(SystemDevice(host.sys), SWTDataDipoleDevice(host.data))
+SpinWaveTheoryDevice(host::SpinWaveTheory) = SpinWaveTheoryDevice(SystemDevice(host.sys), SWTDataDipoleDevice(host.data), host.regularization)
 
 function Adapt.adapt_structure(to, swt::SpinWaveTheoryDevice)
     sys = Adapt.adapt_structure(to, swt.sys)
     data = Adapt.adapt_structure(to, swt.data)
-    SpinWaveTheoryDevice(sys, data)
+    regularization = Adapt.adapt_structure(to, swt.regularization)
+    SpinWaveTheoryDevice(sys, data, regularization)
 end
 
 #function Adapt.adapt_structure(to, swt::SpinWaveTheory::System)
