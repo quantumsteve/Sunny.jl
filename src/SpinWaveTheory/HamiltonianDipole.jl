@@ -270,6 +270,7 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     H21 = view(H, L+1:2L, 1:L)
     H22 = view(H, L+1:2L, L+1:2L)
 
+    @assert isnothing(swt.sys.ewald)
     swt_device = SpinWaveTheoryDevice(swt)
     CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device, q_reshaped, L)
 end
