@@ -165,6 +165,11 @@ end
 
 function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
     i = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
+
+    (; sys, data) = swt
+    (; local_rotations, stevens_coefs, sqrtS) = data
+    (; extfield, gs) = sys
+
     #=coupling = int_pair[i]
     
     # Zeeman term
@@ -207,24 +212,9 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     H21 = view(H, L+1:2L, 1:L)
     H22 = view(H, L+1:2L, L+1:2L)
 
-    #extfield_d = CUDA.CuArray(extfield)
-    #gs_d = CUDA.CuArray(gs)
-    #local_rotations_d = CUDA.CuArray(local_rotations)
-    #stevens_coefs_d = CUDA.CuArray(stevens_coefs)
-    #sqrtS_d = CUDA.CuArray(sqrtS)
-    #int_pair_d = CUDA.CuArray(sys.interactions_union.pair)
-
     swt_device = SpinWaveTheoryDevice(swt)
-    println(typeof(swt_device), ' ', isbitstype(typeof(swt_device)))
-    println(typeof(swt_device.sys), ' ', isbitstype(typeof(swt_device.sys)))
-    println(typeof(swt_device.sys.extfield), ' ',isbitstype(typeof(swt_device.sys.extfield)))
-    println(typeof(swt_device.sys.gs), ' ',isbitstype(typeof(swt_device.sys.gs)))
-    println(typeof(swt_device.data), ' ',isbitstype(typeof(swt_device.data)))
-    println(typeof(swt_device.data.local_rotations), ' ',isbitstype(typeof(swt_device.data.local_rotations)))
-    println(typeof(swt_device.data.stevens_coefs), ' ',isbitstype(typeof(swt_device.data.stevens_coefs)))
-    println(typeof(swt_device.data.sqrtS), ' ',isbitstype(typeof(swt_device.data.sqrtS)))
-    isbitstype(CUDA.CuArray)
-    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device.sys)
+
+    CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device)
 end
 
 

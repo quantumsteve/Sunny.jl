@@ -70,9 +70,9 @@ struct SpinWaveTheory <: AbstractSpinWaveTheory
     regularization :: Float64
 end
 
-struct SpinWaveTheoryDevice
-    sys   :: SystemDevice
-    data  :: SWTDataDipoleDevice
+struct SpinWaveTheoryDevice{TSys, TData}
+    sys   :: TSys
+    data  :: TData
 end
 
 SpinWaveTheoryDevice(host::SpinWaveTheory) = SpinWaveTheoryDevice(SystemDevice(host.sys), SWTDataDipoleDevice(host.data))
