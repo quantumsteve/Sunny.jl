@@ -16,7 +16,7 @@
 # From the Julia prompt, load Sunny and also [GLMakie](https://docs.makie.org/)
 # for graphics.
 
-using Sunny
+using Sunny, GLMakie
 
 # If these packages are not yet installed, Julia will offer to install them. If
 # executing this tutorial gives an error, you may need to update Sunny and
