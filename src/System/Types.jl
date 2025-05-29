@@ -73,7 +73,7 @@ struct InteractionsDevice
     pair    :: AbstractVector{PairCoupling}
 end
 
-InteractionsDevice(host::Interactions) = InteractionsDevice(host.onsite, CUDA.CUVector(host.pair))
+InteractionsDevice(host::Interactions) = InteractionsDevice(host.onsite, CUDA.CuVector(host.pair))
 
 function Adapt.adapt_structure(to, inter::InteractionsDevice)
     onsite = Adapt.adapt_structure(to, inter.onsite)
@@ -129,15 +129,17 @@ mutable struct System{N}
     const rng              :: Random.Xoshiro
 end
 
-struct SystemDevice{TArrField, TArrGs}
-    extfield :: TArrField # External B field
-    gs       :: TArrGs # g-tensor per atom in unit cell
+struct SystemDevice{TArrField, TArrInt, TArrGs}
+    extfield           :: TArrField # External B field
+    interactions_union :: TArrInt # Interactions
+    gs                 :: TArrGs # g-tensor per atom in unit cell
 end
 
-SystemDevice(host::System) = SystemDevice(CUDA.CuArray(host.extfield), CUDA.CuArray(host.gs))
+SystemDevice(host::System) = SystemDevice(CUDA.CuArray(host.extfield), CUDA.CuArray(map(op -> InteractionsDevice(op), host.interactions_union)), CUDA.CuArray(host.gs))
 
 function Adapt.adapt_structure(to, sys::SystemDevice)
     extfield = Adapt.adapt_structure(to, sys.extfield)
+    interactions_union = Adapt.adapt_structure(to, sys.interactions_union)
     gs = Adapt.adapt_structure(to, sys.gs)
-    SystemDevice(extfield, gs)
+    SystemDevice(extfield, interactions_union, gs)
 end
