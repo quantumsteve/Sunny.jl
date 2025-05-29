@@ -197,10 +197,6 @@ end
 function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
     println("dipole")
 
-    (; sys, data) = swt
-    (; local_rotations, stevens_coefs, sqrtS) = data
-    (; extfield, gs) = sys
-
     L = nbands(swt)
     @assert size(H) == (2L, 2L)
 
