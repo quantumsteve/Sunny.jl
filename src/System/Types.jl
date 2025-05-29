@@ -129,9 +129,9 @@ mutable struct System{N}
     const rng              :: Random.Xoshiro
 end
 
-struct SystemDevice
-    extfield :: AbstractArray{Vec3, 4} # External B field
-    gs       :: AbstractArray{Mat3, 4} # g-tensor per atom in unit cell
+struct SystemDevice{TArrField, TArrGs}
+    extfield :: TArrField # External B field
+    gs       :: TArrGs # g-tensor per atom in unit cell
 end
 
 SystemDevice(host::System) = SystemDevice(CUDA.CuArray(host.extfield), CUDA.CuArray(host.gs))
