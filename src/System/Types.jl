@@ -60,6 +60,17 @@ struct PairCoupling
     end
 end
 
+struct PairCouplingDevice
+    isculled :: Bool
+end
+
+PairCouplingDevice(host::PairCoupling) = PairCouplingDevice(host.isculled)
+
+function Adapt.adapt_structure(to, pair::PairCouplingDevice)
+    isculled = Adapt.adapt_structure(to, pair.isculled)
+    PairCouplingDeviceDevice(isculled)
+end
+
 mutable struct Interactions
     # Onsite coupling is either an N×N Hermitian matrix or possibly renormalized
     # Stevens coefficients, depending on the mode :SUN or :dipole.
@@ -68,16 +79,18 @@ mutable struct Interactions
     pair :: Vector{PairCoupling}
 end
 
-struct InteractionsDevice
-    onsite  :: StevensExpansion
-    pair    :: AbstractVector{PairCoupling}
+struct InteractionsDevice{TPair}
+    #onsite  :: StevensExpansion
+    pair    :: TPair
+    pair_length :: Int
 end
 
-InteractionsDevice(host::Interactions) = InteractionsDevice(host.onsite, CUDA.CuVector(host.pair))
+InteractionsDevice(host::Interactions) = InteractionsDevice(CUDA.CuVector(map(op -> op.scalar, host.pair)), length(host.pair))
 
 function Adapt.adapt_structure(to, inter::InteractionsDevice)
-    onsite = Adapt.adapt_structure(to, inter.onsite)
+    #onsite = Adapt.adapt_structure(to, inter.onsite)
     pair = Adapt.adapt_structure(to, inter.pair)
+    pair_length = Adapt.adapt_structure(to, inter.pair_length)
     InteractionsDevice(onsite, pair)
 end
 

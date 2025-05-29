@@ -1,6 +1,7 @@
 using CUDA
 using CUDA: i32
 import Adapt
+using Cthulhu
 
 # Set the dynamical quadratic Hamiltonian matrix in dipole mode. 
 function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
@@ -164,14 +165,14 @@ function swt_hamiltonian_dipole!(H::Matrix{ComplexF64}, swt::SpinWaveTheory, q_r
 end
 
 function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, stevens_coefs, sqrtS, int_pair)
-    i = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
-
     (; sys, data) = swt
     (; local_rotations, stevens_coefs, sqrtS) = data
     (; extfield, gs) = sys
 
-    #=coupling = int_pair[i]
-    
+    i = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
+    #k = (blockIdx().y - 1i32) * blockDim().y + threadIdx().y
+
+    int = sys.interactions_union[i]
     # Zeeman term
     B = gs[1, 1, 1, i]' * extfield[1, 1, 1, i]
     B′ = - dot(B, local_rotations[i][:, 3])
@@ -189,8 +190,70 @@ function fill_matrix(H11, H12, H21, H22, swt) # gs, extfield, local_rotations, s
     H21[i, i] += conj(A2)
 
     # Pair interactions
-    for coupling in int.pair
-    end=#
+    # for coupling in int.pair
+    for k in 1:int.pair_length
+        coupling = int.pair[k]
+    #=
+        (; isculled, bond) = coupling
+        isculled && break
+        (; i, j) = bond
+
+        phase = exp(2π*im * dot(q_reshaped, bond.n)) # Phase associated with periodic wrapping
+        si = sqrtS[i]^2
+        sj = sqrtS[j]^2
+        sij = sqrtS[i] * sqrtS[j]
+
+        # Bilinear exchange
+        if !iszero(coupling.bilin)
+            J = coupling.bilin  # Transformed exchange matrix
+
+            Q = 0.5 * sij * (J[1, 1] + J[2, 2] - im*(J[1, 2] - J[2, 1]))
+            H11[i, j] += Q * phase
+            H11[j, i] += conj(Q) * conj(phase)
+            H22[i, j] += conj(Q) * phase
+            H22[j, i] += Q  * conj(phase)
+
+            P = 0.5 * sij * (J[1, 1] - J[2, 2] - im*(J[1, 2] + J[2, 1]))
+            H21[i, j] += P * phase
+            H21[j, i] += P * conj(phase)
+            H12[i, j] += conj(P) * phase
+            H12[j, i] += conj(P) * conj(phase)
+
+            H11[i, i] -= sj * J[3, 3]
+            H11[j, j] -= si * J[3, 3]
+            H22[i, i] -= sj * J[3, 3]
+            H22[j, j] -= si * J[3, 3]
+        end
+
+        # Biquadratic exchange
+        if !iszero(coupling.biquad)
+            K = coupling.biquad  # Transformed quadrupole exchange matrix
+
+            Sj2Si = sj^2 * si
+            Si2Sj = si^2 * sj
+            H11[i, i] += -12 * Sj2Si * K[3, 3]
+            H22[i, i] += -12 * Sj2Si * K[3, 3]
+            H11[j, j] += -12 * Si2Sj * K[3, 3]
+            H22[j, j] += -12 * Si2Sj * K[3, 3]
+            H21[i, i] += 4 * Sj2Si * (K[1, 3] - im*K[5, 3])
+            H12[i, i] += 4 * Sj2Si * (K[1, 3] + im*K[5, 3])
+            H21[j, j] += 4 * Si2Sj * (K[3, 1] - im*K[3, 5])
+            H12[j, j] += 4 * Si2Sj * (K[3, 1] + im*K[3, 5])
+
+            Q = 0.5 * sij^3 * ( K[4, 4]+K[2, 2] - im*(-K[4, 2]+K[2, 4]))
+            H11[i, j] += Q * phase
+            H11[j, i] += conj(Q * phase)
+            H22[i, j] += conj(Q) * phase
+            H22[j, i] += Q  * conj(phase)
+
+            P = 0.5 * sij^3 * (-K[4, 4]+K[2, 2] - im*( K[4, 2]+K[2, 4]))
+            H21[i, j] += P * phase
+            H12[j, i] += conj(P * phase)
+            H21[j, i] += P * conj(phase)
+            H12[i, j] += conj(P) * phase
+        end
+    =#
+    end
     return nothing
 end
 
@@ -209,11 +272,27 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     H22 = view(H, L+1:2L, L+1:2L)
 
     swt_device = SpinWaveTheoryDevice(swt)
-
+    CUDA.@allowscalar println(typeof(swt_device.sys.interactions_union[1].pair))
     CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device)
 end
+#=
+function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q_reshaped::Vec3)
+    (; sys, data) = swt
+    (; local_rotations, stevens_coefs, sqrtS) = data
+    (; extfield, gs) = sys
+
+    L = nbands(swt)
+    @assert size(H) == (2L, 2L)
+
+    H .= 0.0 
 
 
+    for (i, int) in enumerate(sys.interactions_union)
+        println(i, ' ', CUDA.length(int.pair))
+        #for coupling in int.pair
+    end
+end    
+=#
 function multiply_by_hamiltonian_dipole!(y::AbstractMatrix{ComplexF64}, x::AbstractMatrix{ComplexF64}, swt::SpinWaveTheory, qs_reshaped::Vector{Vec3};
                                          phases=zeros(ComplexF64, size(qs_reshaped)))
     (; sys, data) = swt
