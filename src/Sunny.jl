@@ -22,6 +22,7 @@ import Brillouin
 
 import CUDA
 import Adapt
+import Cthulhu
 
 include("MathBasics.jl")
 
