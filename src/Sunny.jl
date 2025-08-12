@@ -98,7 +98,7 @@ include("SpinWaveTheory/HamiltonianDipole.jl")
 include("SpinWaveTheory/HamiltonianSUN.jl")
 include("SpinWaveTheory/DispersionAndIntensities.jl")
 include("SpinWaveTheory/LSWTCorrections.jl")
-export SpinWaveTheory, excitations, excitations!, dispersion, intensities, intensities_bands,
+export SpinWaveTheory, excitations, excitations!, dispersion, intensities, intensities_bands, intensities_bands_cuda
     intensities_static
 
 include("Spiral/LuttingerTisza.jl")

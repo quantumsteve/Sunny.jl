@@ -132,7 +132,7 @@ sys_prim = reshape_supercell(sys, shape)
 formfactors = [1 => FormFactor("Co2")]
 measure = ssf_perp(sys_prim; formfactors)
 swt = SpinWaveTheory(sys_prim; measure)
-
+println(typeof(measure))
 # Select [`lorentzian`](@ref) broadening with a full-width at half-maximum
 # (FWHM) of 0.8 meV. 
 
@@ -153,7 +153,12 @@ path = q_space_path(cryst, qs, 500)
 
 energies = range(0, 6, 300)
 res = intensities(swt, path; energies, kernel)
-plot_intensities(res; units, title="CoRh₂O₄ LSWT")
+cpu = intensities_bands(swt, path)
+gpu = intensities_bands_cuda(swt, path)
+println(cpu.disp[:,1],'\n',cpu.data[:,1])
+println(gpu.disp[:,1],'\n',gpu.data[:,1])
+
+#plot_intensities(res; units, title="CoRh₂O₄ LSWT")
 
 # Sometimes experimental data is only available as a powder average, i.e., as an
 # average over all possible crystal orientations. Use [`powder_average`](@ref)
