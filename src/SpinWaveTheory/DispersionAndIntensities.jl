@@ -136,7 +136,7 @@ function excitations!(T, tmp, swt::SpinWaveTheory, q)
     end
 end
 
-function excitations_cuda!(T, tmp::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q)
+function excitations_cuda!(T::Matrix{ComplexF64}, tmp::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory, q)
     L = nbands(swt)
     size(T) == size(tmp) == (2L, 2L) || error("Arguments T and tmp must be $(2L)×$(2L) matrices")
 
@@ -144,8 +144,7 @@ function excitations_cuda!(T, tmp::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheory
     dynamical_matrix_cuda!(tmp, swt, q_reshaped)
 
     T_d = CUDA.CuArray(T)
-    energies_d = bogoliubov!(T_d, tmp)
-    energies = Array(energies_d)
+    energies = bogoliubov!(T_d, tmp)
     T .= Array(T_d)
     return energies
 end
@@ -215,14 +214,14 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
 
     # Preallocation
     T = zeros(ComplexF64, 2L, 2L)
-    H = CUDA.zeros(ComplexF64, 2L, 2L)
+    H = zeros(ComplexF64, 2L, 2L)
     Avec_pref = zeros(ComplexF64, Nobs, Na)
     disp = zeros(Float64, L, Nq)
     intensity = zeros(eltype(measure), L, Nq)
 
     for (iq, q) in enumerate(qpts.qs)
         q_global = cryst.recipvecs * q
-        view(disp, :, iq) .= view(excitations_cuda!(T, H, swt, q), L+1:2L)
+        view(disp, :, iq) .= view(excitations!(T, H, swt, q), 1:L)
 
         for i in 1:Na, μ in 1:Nobs
             r_global = global_position(sys, (1, 1, 1, i)) # + offsets[μ, i]
@@ -239,7 +238,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
             if sys.mode == :SUN
                 data = swt.data::SWTDataSUN
                 N = sys.Ns[1]
-                t = reshape(view(T, :, band + L), N-1, Na, 2)
+                t = reshape(view(T, :, band), N-1, Na, 2)
                 for i in 1:Na, μ in 1:Nobs
                     O = data.observables_localized[μ, i]
                     for α in 1:N-1
@@ -249,7 +248,7 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
             else
                 @assert sys.mode in (:dipole, :dipole_uncorrected)
                 data = swt.data::SWTDataDipole
-                t = reshape(view(T, :, band + L), Na, 2)
+                t = reshape(view(T, :, band), Na, 2)
                 for i in 1:Na, μ in 1:Nobs
                     O = data.observables_localized[μ, i]
                     # This is the Avec of the two transverse and one
@@ -271,6 +270,86 @@ function intensities_bands(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
     disp = reshape(disp, L, size(qpts.qs)...)
     intensity = reshape(intensity, L, size(qpts.qs)...)
     return BandIntensities(cryst, qpts, disp, intensity)
+end
+
+"""
+    intensities_bands(swt::SpinWaveTheory, qpts; kT=0)
+
+Calculate spin wave excitation bands for a set of q-points in reciprocal space.
+This calculation is analogous to [`intensities`](@ref), but does not perform
+line broadening of the bands.
+"""
+function intensities_bands_cuda(swt::SpinWaveTheory, qpts; kT=0, with_negative=false)
+    (; sys, measure) = swt
+    measure_d = MeasureSpecDevice(measure)
+    isempty(measure.observables) && error("No observables! Construct SpinWaveTheory with a `measure` argument.")
+    with_negative && error("Option `with_negative=true` not yet supported.")
+
+    qpts = convert(AbstractQPoints, qpts)
+    cryst = orig_crystal(sys)
+
+    # Number of (magnetic) atoms in magnetic cell
+    @assert sys.dims == (1,1,1)
+    Na = nsites(sys)
+    # Number of chemical cells in magnetic cell
+    Ncells = Na / natoms(cryst)
+    # Number of quasiparticle modes
+    L = nbands(swt)
+    # Number of wavevectors
+    Nq = length(qpts.qs)
+
+    # Temporary storage for pair correlations
+    Nobs = num_observables(measure)
+    Ncorr = num_correlations(measure)
+    corrbuf = CUDA.zeros(ComplexF64, Ncorr)
+
+    # Preallocation
+    T = zeros(ComplexF64, 2L, 2L)
+    H = CUDA.zeros(ComplexF64, 2L, 2L)
+    Avec_pref = zeros(ComplexF64, Nobs, Na)
+    disp = CUDA.zeros(Float64, L, Nq)
+    intensity = CUDA.zeros(eltype(measure), L, Nq)
+
+    for (iq, q) in enumerate(qpts.qs)
+        q_global = cryst.recipvecs * q
+        view(disp, :, iq) .= view(excitations_cuda!(T, H, swt, q), L+1:2L)
+
+        for i in 1:Na, μ in 1:Nobs
+            r_global = global_position(sys, (1,1,1,i)) # + offsets[μ,i]
+            ff = get_swt_formfactor(measure, μ, i)
+            Avec_pref[μ, i] = exp(- im * dot(q_global, r_global))
+            Avec_pref[μ, i] *= compute_form_factor(ff, norm2(q_global))
+        end
+
+        Avec = CUDA.zeros(ComplexF64, Nobs)
+
+        # Fill `intensity` array
+        for band in 1:L
+            fill!(Avec, 0)
+            @assert sys.mode in (:dipole, :dipole_uncorrected)
+            data = swt.data::SWTDataDipole
+            t = reshape(view(T, :, band + L), Na, 2)
+            for i in 1:Na, μ in 1:Nobs
+                O = data.observables_localized[μ, i]
+                # This is the Avec of the two transverse and one
+                # longitudinal directions in the local frame. (In the
+                # local frame, z is longitudinal, and we are computing
+                # the transverse part only, so the last entry is zero)
+                displacement_local_frame = SA[t[i, 2] + t[i, 1], im * (t[i, 2] - t[i, 1]), 0.0]
+                CUDA.@allowscalar Avec[μ] += Avec_pref[μ, i] * (data.sqrtS[i]/√2) * (O' * displacement_local_frame)[1]
+            end
+
+            map!(corrbuf, measure_d.corr_pairs) do (α, β)
+                Avec[α] * conj(Avec[β]) / Ncells
+            end
+            #CUDA.@allowscalar intensity[band, iq] = thermal_prefactor(disp[band, iq]; kT) * measure.combiner(q_global, corrbuf)
+            map!(x -> thermal_prefactor(x; kT) * measure_d.combiner(SA[q_global[1], q_global[2], q_global[3]], corrbuf), intensity, disp)
+        end
+    end
+
+    disp = reshape(disp, L, size(qpts.qs)...)
+    intensity = reshape(intensity, L, size(qpts.qs)...)
+    return BandIntensities(cryst, qpts, Array(disp), Array(intensity))
 end
 
 """

@@ -49,6 +49,83 @@ function isapprox_mod1(x::AbstractArray, y::AbstractArray; opts...)
     return isapprox(Δ, zero(Δ); opts...)
 end
 
+# Calculates norm(a - b)^2 without allocating
+function reduce_kernel(f, op, v0::T, A, B, ::Val{LMEM}, result) where {T, LMEM}
+    tmp_local = CUDA.@cuStaticSharedMem(T, LMEM)
+    global_index = threadIdx().x
+    acc = v0
+
+    # Loop sequentially over chunks of input vector
+    while global_index <= length(A)
+        element = f(A[global_index], B[global_index])
+        acc = op(acc, element)
+        global_index += blockDim().x
+    end
+
+    # Perform parallel reduction
+    local_index = threadIdx().x - 1
+    @inbounds tmp_local[local_index + 1] = acc
+    sync_threads()
+
+    offset = blockDim().x ÷ 2
+    while offset > 0
+        @inbounds if local_index < offset
+            other = tmp_local[local_index + offset + 1]
+            mine = tmp_local[local_index + 1]
+            tmp_local[local_index + 1] = op(mine, other)
+        end
+        sync_threads()
+        offset = offset ÷ 2
+    end
+
+    if local_index == 0
+        result[blockIdx().x] = @inbounds tmp_local[1]
+    end
+
+    return
+end
+
+function mapreduce_gpu(f::Function, op::Function, A, B)
+    OT = Float64
+    v0 = 0.0
+
+    threads = 256
+    out = CuArray{OT}(undef, (1,))
+    CUDA.@cuda threads=threads reduce_kernel(f, op, v0, A, B, Val{threads}(), out)
+    Array(out)[1]
+end
+
+# Calculates norm(a - b)^2 without allocating
+function diffnorm2_cuda(A, B)
+    @assert size(A) == size(B) "Non-matching dimensions"
+    return mapreduce_gpu(diffnorm2, +, A, B)
+end
+
+_hermitianpart(a::Number) = real(a)
+
+function _hermitianpart!(A, n)
+    k = threadIdx().x
+    i::Int = floor((2*n+1 - sqrt((2n+1)*(2n+1) - 8*k))/2)
+    j::Int = k - n*i + i*(i-1)/2
+    if i == j
+        A[j, j] = _hermitianpart(A[j, j])
+    else
+        A[i, j] = val = (A[i, j] + adjoint(A[j, i])) / 2
+        A[j, i] = adjoint(val)
+    end
+    return nothing
+end
+
+#=
+function hermitianpart!(A)
+    #require_one_based_indexing(A)
+    n = size(A, 1)
+    @assert size(A, 2) == n
+    CUDA.@cuda threads=div(n*(n+1), 2) _hermitianpart!(A, n)
+    return A
+end
+=#
+
 # Project `v` onto space perpendicular to `n`
 @inline proj(v, n) = v - n * ((n' * v) / norm2(n))
 

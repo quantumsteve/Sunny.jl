@@ -273,6 +273,8 @@ function swt_hamiltonian_dipole!(H::CUDA.CuArray{ComplexF64}, swt::SpinWaveTheor
     @assert isnothing(swt.sys.ewald)
     swt_device = SpinWaveTheoryDevice(swt)
     CUDA.@cuda threads=L fill_matrix(H11, H12, H21, H22, swt_device, q_reshaped, L)
+    # @assert diffnorm2_cuda(H, H') < 1e-12
+    # hermitianpart!(H)
 end
 
 function multiply_by_hamiltonian_dipole!(y::AbstractMatrix{ComplexF64}, x::AbstractMatrix{ComplexF64}, swt::SpinWaveTheory, qs_reshaped::Vector{Vec3};
