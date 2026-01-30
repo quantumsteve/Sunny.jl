@@ -1,4 +1,6 @@
 import Random, Statistics
+using NVTX
+using Colors
 
 """
     powder_average(f, cryst, radii, n; seed=0)
@@ -21,6 +23,13 @@ plot_intensities(res)
 ```
 """
 function powder_average(f, cryst, radii, n::Int, seed::Int, batch_size::Int)
+    @assert NVTX.isactive()
+    domain = NVTX.Domain("powder_average")
+    NVTX.name_category(domain, 1, "powder_average")
+    NVTX.name_category(domain, 2, "radii batch")
+
+    outer_range = NVTX.range_start(domain; message="powder_average", color=colorant"red")
+
     res = f(CUDA.CuArray([Sunny.Vec3(0,0,0)])) # Dummy call to learn types
     if res isa IntensitiesDevice
         data = CUDA.zeros(Float64, length(res.energies), length(radii))
@@ -36,6 +45,7 @@ function powder_average(f, cryst, radii, n::Int, seed::Int, batch_size::Int)
     tmp = CUDA.CuArray{Sunny.Vec3}(undef, length(sphpts), batch_size)
     batches = Iterators.partition(radii, batch_size)
     for (batch_idx, radii_batch) in enumerate(batches)
+        NVTX.range_push(domain; message="radii batch", category=2, payload=batch_idx,color=colorant"green")
         for (ii, radius) in enumerate(radii_batch)
             R = Sunny.Mat3(Sunny.random_orthogonal(rng, 3))
             tmp[:, ii] .= Ref(to_rlu * R * radius) .* sphpts
@@ -50,6 +60,9 @@ function powder_average(f, cryst, radii, n::Int, seed::Int, batch_size::Int)
         else
             error("Provided function must call `IntensitiesDevice`.")
         end
+        NVTX.range_pop(domain)
     end
+    NVTX.range_end(outer_range)
     return ret
 end
+

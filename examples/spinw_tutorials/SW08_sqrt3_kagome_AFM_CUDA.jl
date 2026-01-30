@@ -9,7 +9,7 @@
 
 using CUDA
 #CUDA.set_runtime_version!(v"12.9"; local_toolkit=true)
-using Sunny, GLMakie
+using Sunny#, GLMakie
 
 # Define the chemical cell of a kagome lattice with spacegroup 147 (P-3).
 
@@ -65,17 +65,17 @@ swt_d = to_device(swt)
 # intensities are dominated by a flat band at zero energy transfer, select an
 # empirical `colorrange` that brings the lower-intensity features into focus.
 
-radii = range(0, 2.5, 200)
-energies = range(0, 2.5, 200)
+radii = range(0, 2.5, 600)
+energies = range(0, 2.5, 600)
 kernel = gaussian(fwhm=0.05)
-@time res_d = powder_average(cryst, radii, 200, batch_size=3) do qs
+@time res_d = powder_average(cryst, radii, 600, batch_size=20) do qs
     intensities(swt_d, qs; energies, kernel)
 end
-for i in 1:3
+for i in 20:20
     println(i)
-    @time global res_d = powder_average(cryst, radii, 200, batch_size=i) do qs
+    @time global res_d = powder_average(cryst, radii, 600, batch_size=i) do qs
         intensities(swt_d, qs; energies, kernel)
     end
 end
 res = Sunny.PowderIntensities(res_d, cryst)
-plot_intensities(res; units, colorrange=(0, 20))
+#plot_intensities(res; units, colorrange=(0, 20))
