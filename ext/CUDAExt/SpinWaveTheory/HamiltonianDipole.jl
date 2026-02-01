@@ -114,16 +114,10 @@ function fill_matrix(H, swt, qs_reshaped, qs, L)
                     H21_ji += P * conj(phase)
                     H12_ij += conj(P) * phase
                 end
-                H11[i,j] += H11_ij
-                H11[j,i] += H11_ji
-                H11[j,j] += H11_jj
-                H22[i,j] += H22_ij
-                H22[j,i] += H22_ji
-                H22[j,j] += H22_jj
-                H12[i,j] += H12_ij
-                H12[j,i] += H12_ji
-                H21[i,j] += H21_ij
-                H21[j,i] += H21_ji
+                H11[i, i] += H11_ii
+                H22[i, i] += H22_ii
+                H12[i, i] += H12_ii
+                H21[i, i] += H22_ii
             end
             H11[i, i] += H11_ii
             H22[i, i] += H22_ii
