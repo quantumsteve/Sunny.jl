@@ -134,9 +134,6 @@ function Sunny.intensities_bands(swt::SpinWaveTheoryDevice, qpts; kT=0, with_neg
     H_d = CUDA.zeros(ComplexF64, 2L, 2L, Nq)
     Sunny.dynamical_matrix!(H_d, swt, reshaped_rlu, qs_d)
 
-    H_dp = [view(H_d,:,:,i) for i in 1:Nq]
-    CUSOLVER.potrfBatched!('L', H_dp)
-
     I_d = CUDA.zeros(ComplexF64, 2L, 2L, Nq)
     kernel = @cuda launch=false _set_identity(I_d)
     config = launch_configuration(kernel.fun)
