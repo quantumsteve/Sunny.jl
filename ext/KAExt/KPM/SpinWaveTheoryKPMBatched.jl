@@ -155,7 +155,7 @@ function intensities_lanczos_device_batched_ka!(data, swt_kry_d::SpinWaveTheoryK
             c = (iq - 1) * Nobs + ξ
             q_reshaped_chain_host[c] = SVector{3, T}(q_reshaped_host[iq])
         end
-    endpow5_ka
+    end
     q_reshaped_chain_dev = _backend_array(backend, q_reshaped_chain_host)
 
     v_batch   = KernelAbstractions.zeros(backend, CT, N_chains, twoL)
