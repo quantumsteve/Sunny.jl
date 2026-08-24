@@ -545,7 +545,7 @@ function intensities_static_device_batched_ka!(data, swt_kry_d::SpinWaveTheoryKP
     end
 
     αs_matrix, βs_matrix, lhs_adj_Q, n_iters_done_per_chain, c_norm_per_chain = try
-     pow5_ka   lanczos_device_batched_ka(
+        lanczos_device_batched_ka(
             mulA!, mulS!,
             v_batch, vp_batch, Sv_batch, Svp_batch, w_batch, Sw_batch,
             lhs_dev, corr_dev, corr_host,
