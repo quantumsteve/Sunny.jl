@@ -19,7 +19,7 @@
 # that puts the spectrum above the FP32 noise floor.  See:
 # `SpinWaveTheoryKPM` docstring and the benchmark file for guidance.
 
-@testsnippet KABackendSetup begin
+@testsnippet KABackend begin
     using KernelAbstractions
     backend = KernelAbstractions.CPU()
     ka_ext = Base.get_extension(Sunny, :KAExt)
@@ -36,13 +36,8 @@ end
 # ---------------------------------------------------------------------------
 # API: dispatch and rejection of unsupported precisions
 # ---------------------------------------------------------------------------
-#=
-@testitem "KA: to_device_batched precision dispatch" setup=[KABackendSetup] begin
 
-    # Build a SpinWaveTheoryKPM with the FP32-recommended regularization.
-    mkswt(sys, measure; method=:lanczos, kwargs...) =
-        SpinWaveTheoryKPM(sys; measure, regularization=FP32_REG, method, kwargs...)
-
+@testitem "KA: to_device_batched precision dispatch" setup=[KABackend] begin
     latvecs = lattice_vectors(1, 1, 1, 90, 90, 90)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
     sys     = System(cryst, [1 => Moment(s=1, g=2)], :dipole; seed=0)
@@ -62,7 +57,7 @@ end
     @test_throws ErrorException Sunny.to_device_batched(swt, backend; precision=BigFloat)
 end
 
-@testitem "KA: rejects unsupported method" setup=[KABackendSetup] begin
+@testitem "KA: rejects unsupported method" setup=[KABackend] begin
     latvecs = lattice_vectors(1, 1, 1, 90, 90, 90)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
     sys     = System(cryst, [1 => Moment(s=1, g=2)], :dipole; seed=0)
@@ -79,7 +74,7 @@ end
 # FP32 Lanczos accuracy vs CPU FP64 Lanczos (apples-to-apples; same algorithm)
 # ---------------------------------------------------------------------------
 
-@testitem "FP32 Lanczos: cubic FM s=1, fixed niters" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: cubic FM s=1, fixed niters" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1.0, 1.0, 1.0, 90, 90, 90)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -109,7 +104,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos: cubic s=2 (regularization=1e-4 stabilizes)" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: cubic s=2 (regularization=1e-4 stabilizes)" setup=[KABackend] begin
     using Random
     # Higher-spin homogeneous system — fails FP32 with default reg=1e-8 due
     # to spectral degeneracies, passes with reg=1e-4 (mentor's recommendation).
@@ -139,7 +134,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos: biquadratic s=1 (regularization=1e-4 stabilizes)" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: biquadratic s=1 (regularization=1e-4 stabilizes)" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 1, 90, 90, 90)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -167,7 +162,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos: disordered triangular AFM (Ex09 30x30) tol-based" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: disordered triangular AFM (Ex09 30x30) tol-based" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 10, 90, 90, 120)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -199,7 +194,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos: external field opens spectral gap" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: external field opens spectral gap" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 10, 90, 90, 120)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -239,7 +234,7 @@ end
 #   - odd user-niters (rounded up to even, matching CPU Lanczos)
 # ---------------------------------------------------------------------------
 
-@testitem "FP32 Lanczos: finite kT (kT=0.5)" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: finite kT (kT=0.5)" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 10, 90, 90, 120)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -271,7 +266,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos: odd user-niters round to even (parity fix)" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: odd user-niters round to even (parity fix)" setup=[KABackend] begin
     using Random
     # Without the parity fix, odd user-specified niters produced
     # catastrophic FP32 errors (rel err ~0.9).  The driver now rounds
@@ -320,7 +315,7 @@ end
 # GPU speedup.
 # ---------------------------------------------------------------------------
 
-@testitem "FP32 Lanczos: powder_average composition" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: powder_average composition" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 10, 90, 90, 120)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -363,7 +358,7 @@ end
 # Edge cases
 # ---------------------------------------------------------------------------
 
-@testitem "FP32 Lanczos: 3-point path" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: 3-point path" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 10, 90, 90, 120)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -395,7 +390,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos: ssf_trace observable" setup=[KABackendSetup] begin
+@testitem "FP32 Lanczos: ssf_trace observable" setup=[KABackend] begin
     using Random
     latvecs = lattice_vectors(1, 1, 10, 90, 90, 120)
     cryst   = Crystal(latvecs, [[0, 0, 0]])
@@ -453,7 +448,7 @@ end
     const SUN_ENERGIES = range(0.0, 4.0, 10)
 end
 
-@testitem "FP32 Lanczos SUN: basic accuracy (SU(3), s=1, 3×3×1, niters=10)" setup=[KABackendSetup, SharedFixture] begin
+@testitem "FP32 Lanczos SUN: basic accuracy (SU(3), s=1, 3×3×1, niters=10)" setup=[KABackend, SharedFixture] begin
     using Random
     # Core correctness: FP32 SUN kernel vs CPU FP64 reference.
     # niters=10 is well below the Paige ghost region for twoL=36.
@@ -473,7 +468,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos SUN: ssf_perp measure" setup=[KABackendSetup, SharedFixture] begin
+@testitem "FP32 Lanczos SUN: ssf_perp measure" setup=[KABackend, SharedFixture] begin
     using Random
     measure  = ssf_perp(SUN_SYS)
     swt      = mkswt(SUN_SYS, measure; niters=10)
@@ -491,7 +486,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos SUN: broadening kernels (gaussian, lorentzian wide/narrow)" setup=[KABackendSetup, SharedFixture] begin
+@testitem "FP32 Lanczos SUN: broadening kernels (gaussian, lorentzian wide/narrow)" setup=[KABackend, SharedFixture] begin
     using Random
     measure  = ssf_trace(SUN_SYS)
     swt      = mkswt(SUN_SYS, measure; niters=10)
@@ -511,7 +506,7 @@ end
     end
 end
 
-@testitem "FP32 Lanczos SUN: adaptive tol=0.05" setup=[KABackendSetup, SharedFixture] begin
+@testitem "FP32 Lanczos SUN: adaptive tol=0.05" setup=[KABackend, SharedFixture] begin
     using Random
     measure  = ssf_trace(SUN_SYS)
     swt      = mkswt(SUN_SYS, measure; tol=0.05)
@@ -529,7 +524,7 @@ end
     @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
 end
 
-@testitem "FP32 Lanczos SUN: finite kT, K→M path (no Goldstone singularity)" setup=[KABackendSetup, SharedFixture] begin
+@testitem "FP32 Lanczos SUN: finite kT, K→M path (no Goldstone singularity)" setup=[KABackend, SharedFixture] begin
     using Random
     # q=Γ has a Goldstone mode with Ritz eigenvalue ~±1e-8; thermal_prefactor
     # sensitivity kT/λ² ≈ 5×10¹² amplifies even FP32 noise there.
@@ -554,7 +549,7 @@ end
     end
 end
 
-@testitem "FP32 Lanczos SUN: odd user-niters parity fix" setup=[KABackendSetup, SharedFixture] begin
+@testitem "FP32 Lanczos SUN: odd user-niters parity fix" setup=[KABackend, SharedFixture] begin
     using Random
     # The FP32 driver rounds odd niters up to even (same fix as FP64 path).
     # Without the fix, niters=5 produced ~27-54% error for SUN mode.
@@ -576,4 +571,4 @@ end
         @test maximum(abs, res_fp32.data .- res_cpu.data) / maxref < FP32_RTOL
     end
 end
-=#
+
