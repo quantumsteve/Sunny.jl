@@ -2,12 +2,8 @@ module KAExt
 
 using Adapt: Adapt
 using KernelAbstractions: KernelAbstractions, @groupsize, @index, @kernel, @localmem, @synchronize, @uniform
-using CUDA: CUDA, @cuda, CUBLAS, CUSOLVER, CuArray, CuDynamicSharedArray,
-            CuMatrix, CuPtr, CuVector, StridedCuArray, blockDim, blockIdx,
-            launch_configuration, threadIdx
 using StaticArrays: StaticArrays, SArray, SMatrix, SVector
-using Sunny: Sunny, Bond, Crystal, SpinWaveTheory, System, global_position, 
-             intensities_bands
+using Sunny: Sunny 
 
 include("System/Types.jl")
 include("System/TypesSUN.jl")
