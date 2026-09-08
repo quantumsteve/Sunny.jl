@@ -12,13 +12,6 @@
 #
 # Requires CUDA
 
-using CUDA
-
-if !CUDA.functional()
-    @info "CUDA not functional — skipping GPU comprehensive SU(N) validation"
-    exit(0)
-end
-
 @testsnippet Backend begin
 using Sunny, KernelAbstractions, CUDA, LinearAlgebra, Printf, Random, StaticArrays
 
@@ -91,7 +84,7 @@ end
 end
 
 # ── Part A: Fixed niters ──────────────────────────────────────────────────────
-@testitem "A: Fixed niters, small system (SU(3), s=1, 9×9×1)" setup=[Backend] begin
+@testitem "A: Fixed niters, small system (SU(3), s=1, 9×9×1)" setup=[Backend] tags=[:cuda] begin
     println("--- Part A: Fixed niters (kernel correctness) ---")
     # SUN bandwidth ~24 (vs ~4 for dipole) → more FP accumulation at same niters.
     # niters<=20 ≈ 1e-6; niters>=30 converges to ~1e-9.
@@ -103,7 +96,7 @@ end
     end
 end
 
-@testitem "A: Fixed niters, medium system (SU(3), s=1, 30×30×1)" setup=[Backend] begin
+@testitem "A: Fixed niters, medium system (SU(3), s=1, 30×30×1)" setup=[Backend] tags=[:cuda] begin
     for niters in [2, 5, 10, 20, 30, 50]
         swt = SpinWaveTheoryKPM(sys_med_r; measure=ssf_trace(sys_med_r), niters=niters)
         # niters=30 on medium (twoL=3600) hits a Paige ghost transient: a converged
@@ -118,7 +111,7 @@ end
 end
 
 # ── Part B: Different measures ────────────────────────────────────────────────
-@testitem "B: Different measure specs (SU(3), s=1, 9×9×1, niters=10)" setup=[Backend] begin
+@testitem "B: Different measure specs (SU(3), s=1, 9×9×1, niters=10)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part B: Different measure specs ---")
     swt_trace = SpinWaveTheoryKPM(sys_small_r; measure=ssf_trace(sys_small_r), niters=10)
     validate("Small SU(N) ssf_trace niters=10", swt_trace, path_small;
@@ -130,7 +123,7 @@ end
 end
 
 # ── Part C: Different broadening kernels ──────────────────────────────────────
-@testitem "C: Different broadening kernels (SU(3), s=1, 9×9×1, niters=10)" setup=[Backend] begin
+@testitem "C: Different broadening kernels (SU(3), s=1, 9×9×1, niters=10)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part C: Different broadening ---")
     swt_base = SpinWaveTheoryKPM(sys_small_r; measure=ssf_trace(sys_small_r), niters=10)
 
@@ -143,7 +136,7 @@ end
 end
 
 # ── Part D: Adaptive tol ──────────────────────────────────────────────────────
-@testitem "D: Adaptive tol (SU(3), s=1, small and medium)" setup=[Backend] begin
+@testitem "D: Adaptive tol (SU(3), s=1, small and medium)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part D: Adaptive tol ---")
     for tol in [0.1, 0.05, 0.01]
         swt  = SpinWaveTheoryKPM(sys_small_r; measure=ssf_trace(sys_small_r), tol=tol)
@@ -160,7 +153,7 @@ end
 end
 
 # ── Part E: Finite temperature ────────────────────────────────────────────────
-@testitem "E: Finite temperature kT>0, K→M path (SU(3), s=1, 9×9×1)" setup=[Backend] begin
+@testitem "E: Finite temperature kT>0, K→M path (SU(3), s=1, 9×9×1)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part E: Finite temperature ---")
     # q=Γ=[0,0,0] has a Goldstone mode with Ritz eigenvalue ~±1e-8. The thermal
     # prefactor |1/expm1(-λ/kT)| has sensitivity kT/λ², giving ~5e12 at λ=1e-8,
@@ -178,7 +171,7 @@ end
 end
 
 # ── Part F: Edge cases ────────────────────────────────────────────────────────
-@testitem "F: Edge cases (SU(3), s=1, 9×9×1, niters=10)" setup=[Backend] begin
+@testitem "F: Edge cases (SU(3), s=1, 9×9×1, niters=10)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part F: Edge cases ---")
     swt_base = SpinWaveTheoryKPM(sys_small_r; measure=ssf_trace(sys_small_r), niters=10)
     path_short = q_space_path(cryst, [[0,0,0],[1/3,1/3,0]], 3)
@@ -190,7 +183,7 @@ end
 end
 
 # ── Part G: Scale independence ────────────────────────────────────────────────
-@testitem "G: Scale independence at niters=10 (SU(3), s=1, Na=36→900)" setup=[Backend] begin
+@testitem "G: Scale independence at niters=10 (SU(3), s=1, Na=36→900)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part G: Scale independence at niters=10 ---")
     # GPU accuracy must be independent of system size Na.
     for (label, dims) in [("6×6",  (2,2,1)),
@@ -212,7 +205,7 @@ end
 end
 
 # ── Part H: Direct matvec ─────────────────────────────────────────────────────
-@testitem "H: Direct matvec comparison, medium system (SU(3), s=1, 30×30×1)" setup=[Backend] begin
+@testitem "H: Direct matvec comparison, medium system (SU(3), s=1, 30×30×1)" setup=[Backend] tags=[:cuda] begin
     println("\n--- Part H: Direct matvec comparison at medium scale ---")
 
     sys_mv = System(cryst, [1 => Moment(s=1, g=2)], :SUN; dims=(3, 3, 1), seed=0)
