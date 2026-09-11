@@ -19,13 +19,6 @@ end
 
 @testitem "ExplicitImports" begin
     import ExplicitImports, LinearAlgebra
-    try
-        ExplicitImports.check_no_implicit_imports(Sunny; skip=(mod, Base, Core, LinearAlgebra))
-    catch e
-        print("An error occurred: ")
-        Base.showerror(stdout, e)
-        println() # Add a newline
-        @test false
-    end
+    @test ExplicitImports.check_no_implicit_imports(Sunny; skip=(mod, Base, Core, LinearAlgebra)) === nothing
 end
 
