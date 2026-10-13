@@ -120,7 +120,7 @@ end
 plot_intensities(res)
 ```
 """
-function powder_average(f, cryst, radii, n::Int; seed=0)
+function powder_average(f, cryst, radii, n::Int; seed=0, batch_size=1)
     res = f([Vec3(0,0,0)]) # Dummy call to learn types
     if res isa Intensities
         data = zeros(length(res.energies), length(radii))
@@ -135,13 +135,23 @@ function powder_average(f, cryst, radii, n::Int; seed=0)
     rng = Random.Xoshiro(seed)
     sphpts = sphere_points(n)
     to_rlu = inv(cryst.recipvecs)
-    for (i, radius) in enumerate(radii)
-        R = Mat3(random_orthogonal(rng, 3))
-        res = f(Ref(to_rlu * R * radius) .* sphpts)
+    batches = Iterators.partition(radii, batch_size)
+    tmp = Array{Sunny.Vec3}(undef, length(sphpts), batch_size)
+    for (batch_idx, radii_batch) in enumerate(batches)
+        for (ii, radius) in enumerate(radii_batch)
+          R = Mat3(random_orthogonal(rng, 3))
+          tmp[:, ii] .= Ref(to_rlu * R * radius) .* sphpts
+        end
+        tmp_v = reshape(view(tmp,:,1:length(radii_batch)), length(sphpts)*length(radii_batch))
+        res = f(tmp_v)
         if res isa Intensities
-            data[:, i] .= Statistics.mean(res.data; dims=2)
+            res_data = reshape(view(res.data,:,:), length(res.energies), length(sphpts), length(radii_batch))
+            start = (batch_idx-1)*batch_size
+            mean = Statistics.mean(res_data; dims=2)
+            view(data,:, start+1:start+length(radii_batch)) .= view(mean,:,1,:)
         else
-            data[i] = Statistics.mean(res.data)
+            res_data = reshape(view(res.data,:), length(sphpts), length(radii_batch))
+            data[start+1:start+length(radii_batch)] .= Statistics.mean(res_data)
         end
     end
 
