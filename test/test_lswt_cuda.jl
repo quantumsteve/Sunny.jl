@@ -43,7 +43,7 @@
     @test norm(Sunny.proj.(Sunny.energy_grad_coherents(sys), sys.coherents)) < 1e-7
 
     # Test energies at an arbitrary wave vector
-    qs = [[0.24331089495721447, 0.2818361515716459, 0.21954858411037714]]
+    qs = Sunny.QPoints([[0.24331089495721447, 0.2818361515716459, 0.21954858411037714]])
     swt = SpinWaveTheory(sys; measure=ssf_perp(sys; apply_g=false))
 
     qs_d = Sunny.to_device(qs)
@@ -145,8 +145,8 @@ end=#
         set_dipole!(sys, (-1, -1, 1), position_to_site(sys, (1/2, 0, 1/2)))
         set_dipole!(sys, (-1, 1, -1), position_to_site(sys, (0, 1/2, 1/2)))
         swt = SpinWaveTheory(sys; measure=ssf_trace(sys))
-        q = [0.8, 0.6, 0.1]
-        qs_d = Sunny.to_device([q])
+        q = Sunny.QPoints([[0.8, 0.6, 0.1]])
+        qs_d = Sunny.to_device(q)
         swt_d = Sunny.to_device(swt)
         res_d = intensities_bands(swt_d, qs_d)
         res = Sunny.BandIntensities(res_d, fcc)
@@ -216,8 +216,8 @@ end=#
 
     swt = SpinWaveTheory(sys; measure=ssf_trace(sys; apply_g=false))
     #res = intensities_bands(swt, [[0,0,0]])
-    q = [0., 0., 0.]
-    qs_d = Sunny.to_device([q])
+    q = Sunny.QPoints([[0., 0., 0.]])
+    qs_d = Sunny.to_device(q)
     swt_d = Sunny.to_device(swt)
     res_d = intensities_bands(swt_d, qs_d)
     res = Sunny.BandIntensities(res_d, cryst)
@@ -304,7 +304,7 @@ end=#
     @test only(disp_dip) ≈ disp_SUN[end-1]
 end=#
 
-
+#TODO: test is failing
 @testitem "Dipole-dipole" tags=[:cuda] begin
     latvecs = lattice_vectors(10, 10, 1, 90, 90, 90)
     cryst = Crystal(latvecs, [[0,0,0]])
@@ -317,7 +317,7 @@ end=#
         @test energy_per_site(sys) ≈ -0.1913132980155851
 
         swt = SpinWaveTheory(sys; measure=ssf_perp(sys))
-        qs = [[0, 0, 0], [0, 0, 1/2], [0, 1/2, 1/2], [0, 0, 0]]
+        qs = Sunny.QPoints([[0, 0, 0], [0, 0, 1/2], [0, 1/2, 1/2], [0, 0, 0]])
         swt_d = Sunny.to_device(swt)
         qs_d = Sunny.to_device(qs)
         res_d = intensities_bands(swt_d, qs_d)
@@ -372,11 +372,11 @@ end
 
     measure = ssf_custom((q, ssf) -> ssf, sys; apply_g=false)
     swt = SpinWaveTheory(sys; measure)
-    q = [0.41568,0.56382,0.76414]
+    q = Sunny.QPoints([[0.41568,0.56382,0.76414]])
     swt_d = Sunny.to_device(swt)
-    qs_d = Sunny.to_device([q])
+    qs_d = Sunny.to_device(q)
     res_d = intensities_bands(swt_d, qs_d)
-    res = Sunny.BandIntensities(res_d, cryst)
+    res = Sunny.BandIntensities(res_d, crystal)
 
     SpinW_energies = [2.6267,2.6541,2.8177,2.8767,3.2458,3.3172,3.4727,3.7767,3.8202,3.8284,3.8749,3.9095,3.9422,3.9730,4.0113,4.0794,4.2785,4.4605,4.6736,4.7564,4.7865]
     SpinW_intensities = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2999830079, -0.2999830079im, 0,0.2999830079im, 0.2999830079, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.3591387785, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5954018134, -0.5954018134im, 0,0.5954018134im, 0.5954018134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.3708506016,1.3708506016im, 0, -1.3708506016im, 1.3708506016, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0511743697, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0734875342, 0.0 + 0.0734875342im, 0, 0.0 - 0.0734875342im, 0.0734875342, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0577275935, -0.0577275935im, 0,0.0577275935im, 0.0577275935, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6.1733740706, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0338873034,0.0338873034im, 0, -0.0338873034im, 0.0338873034, 0, 0, 0, 0]
@@ -432,14 +432,14 @@ end
     q1 = [0.0391,0.0415,0.5530]
     q2 = [0.2360,0.7492,0.9596]
     q3 = [0.1131,0.7654,0.2810]
-    q = [q1,q2,q3]
+    q = Sunny.QPoints([q1,q2,q3])
     formfactors = [1 => FormFactor("Cr4")]
     measure = ssf_custom((q, ssf) -> ssf, sys; formfactors)
     swt = SpinWaveTheory(sys; measure)
     swt_d = Sunny.to_device(swt)
-    q_d = Sunny.to_device([q])
+    q_d = Sunny.to_device(q)
     res_d = intensities_bands(swt_d, q_d)
-    res = Sunny.BandIntensities(res_d, sys.cryst)
+    res = Sunny.BandIntensities(res_d, cryst)
     disp_inds = [107, 89, 118, 140, 112, 16, 103, 75, 142, 18]
     int_inds = [9, 147, 131, 41, 15, 96, 48, 105, 129, 17]
     disp_ref = [8.464621970889235,2.965829202488746,6.539681848582543,2.524276472373584,7.536305768861917,7.21157510322424,9.267100207705882,5.603801899767303,2.2012141464553636,6.933800585478572]
@@ -470,22 +470,22 @@ end
     swt1 = SpinWaveTheory(sys_prim; measure=ssf_perp(sys_prim; formfactors))
     swt2 = SpinWaveTheory(sys; measure=ssf_perp(sys; formfactors))
     kernel = lorentzian(fwhm=0.8)
-    q = randn(3)
+    q = Sunny.QPoints([randn(3)])
     energies = 0:0.01:6
 
     swt1_d = Sunny.to_device(swt1)
-    q_d = Sunny.to_device([q])
-    res1_d = intensities(swt1_d, q_d; energies, kernel)
-    res1 = Sunny.Intensities(res1_d, sys_prim.cryst)
+    q_d = Sunny.to_device(q)
+    kernel_d = Sunny.to_device(kernel)
+    res1_d = intensities(swt1_d, q_d; kernel=kernel_d, energies=energies)
+    res1 = Sunny.Intensities(res1_d, cryst)
 
     swt2_d = Sunny.to_device(swt2)
-    q_d = Sunny.to_device([q])
-    res2_d = intensities(swt2_d, q_d; energies, kernel)
-    res2 = Sunny.Intensities(res2_d, sys.cryst)
+    res2_d = intensities(swt2_d, q_d; kernel=kernel_d, energies=energies)
+    res2 = Sunny.Intensities(res2_d, cryst)
     @test res1.data ≈ res2.data
 end
 
-
+#TODO move to CUDA extension.
 @testitem "Invariance to spin rotation" begin
     using LinearAlgebra, Random
 
