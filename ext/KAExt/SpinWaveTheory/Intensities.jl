@@ -131,13 +131,13 @@ end
 # and amplitudes A, into disp and R at the offset iq0, as in
 # `Sunny.susceptibility_poles`. The measure is evaluated as the `MeasureMode`
 # says.
-function residues_batched!(::CombinerMode, _, disp, R, E, A, swt_d, qs_global, qs_global_d, iq0, Ncells; threaded)
+function residues_batched!(::CombinerMode, ::Nothing, disp, R, E, A, swt_d, qs_global, qs_global_d, iq0, Ncells; threaded)
     (n, nb) = (size(E, 1), length(qs_global))
     residues_combiner!(swt_d.backend)(disp, R, E, A, qs_global_d, swt_d.swt.measure.combiner, swt_d.measure.corr_pairs,
                                       iq0, Ncells; ndrange=(n, nb))
 end
 
-function residues_batched!(mode::ConstantFormsMode, _, disp, R, E, A, swt_d, qs_global, qs_global_d, iq0, Ncells; threaded)
+function residues_batched!(mode::ConstantFormsMode, ::Nothing, disp, R, E, A, swt_d, qs_global, qs_global_d, iq0, Ncells; threaded)
     (n, nb) = (size(E, 1), length(qs_global))
     residues!(swt_d.backend)(disp, R, E, A, mode.forms, iq0, Ncells; ndrange=(n, nb))
 end
