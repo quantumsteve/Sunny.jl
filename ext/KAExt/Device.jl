@@ -1,24 +1,15 @@
-# Copies a host array to a new array on `backend`
-function to_backend(backend, x::AbstractArray)
-    d = KA.allocate(backend, eltype(x), size(x))
-    copyto!(d, convert(Array{eltype(x)}, x))
-    return d
-end
+# Copies a host array to `backend`, as `adapt(backend, x)` does, but never
+# aliasing x, e.g. on the CPU backend, which adapts an `Array` to itself
+to_backend(backend, x::AbstractArray) = adapt(backend, Array(x))
 
-# Copies a host array to `backend`, with its floating point numbers converted to
-# precision F
-to_backend(backend, ::Type{F}, x::AbstractArray) where F = to_backend(backend, map(v -> with_precision(F, v), x))
+# The same with the floating point numbers of x converted to precision F
+to_backend(backend, ::Type{F}, x::AbstractArray) where F = adapt(backend, Array{precision_type(F, eltype(x))}(x))
 
-# The value x with its floating point numbers converted to precision F
-with_precision(::Type{F}, x::AbstractFloat) where F = F(x)
-with_precision(::Type{F}, x::Complex) where F = Complex{F}(x)
-with_precision(::Type{F}, x::Integer) where F = x
-with_precision(::Type{F}, x::Sunny.SArray) where F = map(v -> with_precision(F, v), x)
-
-# The type of `with_precision(F, x)` for x of type S, e.g. for the values of a
-# measure
+# The type S with its floating point numbers in precision F, e.g. for the
+# values of a measure
 precision_type(::Type{F}, ::Type{<:AbstractFloat}) where F = F
 precision_type(::Type{F}, ::Type{<:Complex}) where F = Complex{F}
+precision_type(::Type{F}, ::Type{S}) where {F, S <: Integer} = S
 precision_type(::Type{F}, ::Type{Sunny.SArray{S, E, N, L}}) where {F, S, E, N, L} = Sunny.SArray{S, precision_type(F, E), N, L}
 
 # The precision of `to_device` for `backend`, unless a backend-specific
