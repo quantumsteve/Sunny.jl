@@ -344,7 +344,7 @@ end
 
     sys = System(Crystal(lattice_vectors(1, 1, 1, 90, 90, 90), [[0, 0, 0]]), [1 => Moment(s=1, g=2)], :dipole)
     swt = SpinWaveTheory(sys; measure=nothing)
-    @test_throws "failed to converge" KAExt.throw_bogoliubov_status([KAExt.STATUS_OK, KAExt.STATUS_NOCONVERGE], swt, [[0, 0, 0], [0.5, 0, 0]])
+    @test_throws "failed to converge" KAExt.bogoliubov_status_or_throw([KAExt.STATUS_OK, KAExt.STATUS_NOCONVERGE], swt, [[0, 0, 0], [0.5, 0, 0]])
 end
 
 @testitem "KAExt intensities on CUDA" tags=[:gpu, :cuda] setup=[KAModels] begin

@@ -21,18 +21,20 @@ function bogoliubov_batched!(::JacobiEigensolver, T, E, H, swt_d, qs_supercell; 
     W = KA.allocate(backend, eltype(H), (n, n, nb))
     bogoliubov_jacobi!(backend)(T, E, H, W, status; ndrange=nb)
     KA.synchronize(backend)
-    throw_bogoliubov_status(Array(status), swt_d.swt, qs_supercell)
+    bogoliubov_status_or_throw(Array(status), swt_d.swt, qs_supercell)
 end
 
 function bogoliubov_batched!(::VendorEigensolver, T, E, H, swt_d, qs_supercell; threaded)
     nb = length(qs_supercell)
     status = KA.allocate(swt_d.backend, Int32, nb)
     Sunny.vendor_bogoliubov!(T, E, H, nb, status)
-    throw_bogoliubov_status(Array(status), swt_d.swt, qs_supercell)
+    bogoliubov_status_or_throw(Array(status), swt_d.swt, qs_supercell)
 end
 
-# Errors of `Sunny.bogoliubov_or_throw!` for the first failed wavevector
-function throw_bogoliubov_status(status, swt, qs_supercell)
+# Nothing if every `status` of a batched solver is STATUS_OK, as for a
+# successful `Sunny.bogoliubov_or_throw!`, and otherwise its error for the first
+# failed wavevector
+function bogoliubov_status_or_throw(status, swt, qs_supercell)
     b = findfirst(!=(STATUS_OK), status)
     isnothing(b) && return
     s = status[b]
