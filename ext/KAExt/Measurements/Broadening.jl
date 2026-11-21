@@ -1,15 +1,15 @@
-# Isbits wrappers for the broadening kernels of `Sunny.broaden_poles`, called
-# as k(ε, ω) for a pole at ε and an output energy ω
-
-struct StationaryKernel{F}
-    f :: F
+# Mirror `Sunny.Broadening` and `Sunny.NonstationaryBroadening` on a device,
+# with only their `kernel`, so that they are isbits if it is. They are called as
+# b(ε, ω) for a pole at ε and an output energy ω.
+struct BroadeningDevice{K}
+    kernel :: K  # x = ω - ε -> intensity
 end
-(k::StationaryKernel)(ε, ω) = k.f(ω - ε)
+(b::BroadeningDevice)(ε, ω) = b.kernel(ω - ε)
 
-struct NonstationaryKernel{F}
-    f :: F
+struct NonstationaryBroadeningDevice{K}
+    kernel :: K  # (ε, ω) -> intensity
 end
-(k::NonstationaryKernel)(ε, ω) = k.f(ε, ω)
+(b::NonstationaryBroadeningDevice)(ε, ω) = b.kernel(ε, ω)
 
 # The kernels of `Sunny.gaussian` and `Sunny.lorentzian` in precision F. The
 # closures of Sunny capture their widths in Float64.
@@ -27,33 +27,35 @@ end
 LorentzianKernel{F}(Γ) where F = LorentzianKernel{F}(Γ/2, (Γ/2) / π)
 (k::LorentzianKernel)(x) = k.Γ2π / (x^2 + k.Γ2^2)
 
-function device_kernel(k::Sunny.Broadening, F)
-    k.name == "Gaussian" && return StationaryKernel(GaussianKernel{F}(k.fwhm / 2√(2log(2))))
-    k.name == "Lorentzian" && return StationaryKernel(LorentzianKernel{F}(k.fwhm))
-    return StationaryKernel(k.kernel)
+# A `Sunny.Broadening` or `Sunny.NonstationaryBroadening` on a device, in
+# precision F for the built-in kernels
+function device_kernel(b::Sunny.Broadening, F)
+    b.name == "Gaussian" && return BroadeningDevice(GaussianKernel{F}(b.fwhm / 2√(2log(2))))
+    b.name == "Lorentzian" && return BroadeningDevice(LorentzianKernel{F}(b.fwhm))
+    return BroadeningDevice(b.kernel)
 end
-device_kernel(k::Sunny.NonstationaryBroadening, F) = NonstationaryKernel(k.kernel)
+device_kernel(b::Sunny.NonstationaryBroadening, F) = NonstationaryBroadeningDevice(b.kernel)
 
 # Mirrors `Sunny.thermal_factor`, without the assertion on kT
 thermal_factor(ω, kT) = iszero(kT) ? (ω > 0 ? one(ω) : zero(ω)) : -1 / expm1(-ω/kT)
 
-# Lorentzian of half width η times the thermal factor, mirroring the kernel of
-# `Sunny.broaden_poles` and `Sunny.thermal_factor_at`
-struct LorentzianThermal{F}
+# Mirrors `Sunny.thermal_factor_at`
+function thermal_factor_at(ω, ε, η, kT)
+    iszero(kT) && return ω > 0 ? one(ω) : iszero(ω) ? oftype(ω, 0.5) : zero(ω)
+    iszero(ω) && return 2kT * ε / (ε^2 + η^2)
+    return thermal_factor(ω, kT)
+end
+
+# The kernel `lorentzian_times_thermal` of `Sunny.broaden_poles` in precision
+# F: a Lorentzian of half width η times the thermal factor
+struct LorentzianTimesThermal{F}
     η  :: F
     kT :: F
 end
-function (k::LorentzianThermal{F})(ε, ω) where F
+function (k::LorentzianTimesThermal{F})(ε, ω) where F
     (; η, kT) = k
     L = (η/F(π)) / ((ω - ε)^2 + η^2)
-    th = if iszero(kT)
-        ω > 0 ? one(F) : iszero(ω) ? F(0.5) : zero(F)
-    elseif iszero(ω)
-        2kT * ε / (ε^2 + η^2)
-    else
-        -1 / expm1(-ω/kT)
-    end
-    return L * th
+    return L * thermal_factor_at(ω, ε, η, kT)
 end
 
 # The weight W of each pole for `broaden_peaks!`, which includes the thermal
@@ -130,7 +132,8 @@ function broaden_poles_plan(disp, R; energies, η, kernel, kT)
     if iszero(η)
         return PeakBroadeningDevice(disp, R, energies, device_kernel(kernel, F); kT, thermal=true)
     elseif isnothing(kernel)
-        return PeakBroadeningDevice(disp, R, energies, LorentzianThermal{F}(η, kT); kT, thermal=false)
+        return PeakBroadeningDevice(disp, R, energies, NonstationaryBroadeningDevice(LorentzianTimesThermal{F}(η, kT));
+                                    kT, thermal=false)
     else
         return RetardedBroadeningDevice(disp, R, energies; η, kernel, kT)
     end
