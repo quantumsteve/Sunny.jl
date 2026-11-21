@@ -97,6 +97,28 @@ function EwaldTensorCache(cryst::Crystal, dims::NTuple{3,Int}, μ0_μB², demag:
     return EwaldTensorCache(dims, cryst, μ0_μB², demag, σ², Tuple(mmax), kmax^2, Tuple(nmax), real_terms, excluded)
 end
 
+# The wavevector `q_supercell` as `ewald_interaction_tensor` takes it.
+# Wavevectors that differ by a reciprocal lattice vector are equivalent, and
+# q_supercell is often an integer only up to round-off, so it is rounded to an
+# integer within 1e-12. Returns that wavevector, its offset q0 from the nearest
+# integer, and whether q0 vanishes, so that the k = 0 Fourier mode is singular.
+function ewald_wavevector(q_supercell)
+    q = map(x -> is_integer(x; tol=1e-12) ? round(x) : x, Vec3(q_supercell))
+    q0 = q - round.(q)
+    return (q, q0, norm(q0) < 1e-16)
+end
+
+# The constants of the Ewald sum of `cache`, whose periodic cell is the
+# supercell of `dims` cells: its reciprocal lattice vectors, its volume, and
+# the self-energy of each moment
+function ewald_constants(cache::EwaldTensorCache)
+    (; dims, cryst, σ²) = cache
+    recipvecs = cryst.recipvecs / diagm(Vec3(dims))
+    V = abs(det(cryst.latvecs)) * prod(dims)
+    self_energy = -Mat3(I) / (3(2π)^(3/2) * σ²^(3/2))
+    return (; recipvecs, V, self_energy)
+end
+
 # Calculate the Ewald interaction tensor A[cell, i, j] at the given wavevector q
 # in RLU of the supercell, which spans the `dims` cells. Here `cell` denotes a
 # cell offset shifted by (1,1,1) to suit Julia's 1-based indexing. The usual
@@ -108,13 +130,8 @@ function ewald_interaction_tensor(cache::EwaldTensorCache, q_supercell::Vec3)
     (; dims, cryst, μ0_μB², demag, σ², mmax, kmax², nmax, real_terms, excluded) = cache
     (; positions) = cryst
     na = natoms(cryst)
-    recipvecs = cryst.recipvecs / diagm(Vec3(dims))
-    V = abs(det(cryst.latvecs)) * prod(dims)
-    self_energy = -Mat3(I) / (3(2π)^(3/2) * σ²^(3/2))
-    # Wavevectors that differ by a reciprocal lattice vector are equivalent,
-    # and q_supercell is often an integer only up to round-off
-    q_supercell = map(x -> is_integer(x; tol=1e-12) ? round(x) : x, q_supercell)
-    q0 = q_supercell - round.(q_supercell)
+    (; recipvecs, V, self_energy) = ewald_constants(cache)
+    (q_supercell, q0, q0_is_zero) = ewald_wavevector(q_supercell)
     A = zeros(CMat3, dims..., na, na)
 
     # The target tensor has the symmetry A(off, i, j) = A(-off, j, i)'. For the
@@ -130,7 +147,6 @@ function ewald_interaction_tensor(cache::EwaldTensorCache, q_supercell::Vec3)
     # Proc. R. Soc. Lond. A 373, 27-56 (1980) or Ballenegger, J. Chem. Phys.
     # 140, 161102 (2014) for a modern review. This singular term is present only
     # when q0 = 0.
-    q0_is_zero = norm(q0) < 1e-16
     demag_term = q0_is_zero ? demag / V : zero(Mat3)
 
     #####################################################

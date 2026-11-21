@@ -19,7 +19,7 @@
 end
 
 # The entry A[cell, i, j] of `Sunny.ewald_interaction_tensor` at the wavevector
-# (q, q0, q0_zero) of `ewald_wavevector`, before the excluded couplings, with
+# (q, q0, q0_zero) of `Sunny.ewald_wavevector`, before the excluded couplings, with
 # `cell` the linear index of a cell of the supercell. The Fourier modes and the
 # real-space terms sum in the order of the host. The phases of the Fourier modes
 # are one `cis` each, rather than products of 1D factors.

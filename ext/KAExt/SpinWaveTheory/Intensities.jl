@@ -187,7 +187,7 @@ function accum_ewald_batched!(H, Ã, ewald::QuadraticEwaldDevice{F}, qs_supercel
     backend = KA.get_backend(H)
     n = size(H, 1)
     nb = length(qs_supercell)
-    ewald_qs = ewald_wavevector.(qs_supercell)
+    ewald_qs = Sunny.ewald_wavevector.(qs_supercell)
     (qs, q0s, q0_zeros) = (first.(ewald_qs), getindex.(ewald_qs, 2), last.(ewald_qs))
     ewald_interaction_tensor!(backend)(Ã, cache, to_backend(backend, F, qs), to_backend(backend, F, q0s), to_backend(backend, q0_zeros);
                                        ndrange=(ncells(cache), cache.na, cache.na, nb))

@@ -310,9 +310,8 @@ Adapt.adapt_structure(to, c::EwaldTensorCacheDevice{F}) where F = EwaldTensorCac
 function EwaldTensorCacheDevice{F}(backend, cache::Sunny.EwaldTensorCache) where F
     (; dims, cryst, μ0_μB², demag, σ², mmax, kmax², real_terms, excluded) = cache
     na = Sunny.natoms(cryst)
-    V = abs(det(cryst.latvecs)) * prod(dims)
-    params = EwaldTensorParams{F}(Int32.(dims), cryst.recipvecs / diagm(Vec3(dims)), Int32.(mmax), kmax², σ², 1/V,
-                                  μ0_μB², demag / V, -Sunny.Mat3(I) / (3(2π)^(3/2) * σ²^(3/2)))
+    (; recipvecs, V, self_energy) = Sunny.ewald_constants(cache)
+    params = EwaldTensorParams{F}(Int32.(dims), recipvecs, Int32.(mmax), kmax², σ², 1/V, μ0_μB², demag / V, self_energy)
     terms = vec(real_terms)
     LI = LinearIndices((prod(dims), na, na))
     LC = LinearIndices(dims)
@@ -374,15 +373,6 @@ function QuadraticEwaldDevice{F}(backend, E::Sunny.QuadraticEwald, L) where F
         to_backend(backend, Int32.(site_of[es])),
         to_backend(backend, F, coefs[es]),
     )
-end
-
-# The wavevector `q_supercell` as `Sunny.ewald_interaction_tensor` takes it:
-# rounded to an integer within round-off, then its offset q0 from the nearest
-# integer, and whether q0 vanishes, so that the k = 0 mode is singular
-function ewald_wavevector(q_supercell)
-    q = map(x -> Sunny.is_integer(x; tol=1e-12) ? round(x) : x, Vec3(q_supercell))
-    q0 = q - round.(q)
-    return (q, q0, norm(q0) < 1e-16)
 end
 
 # The shift of the diagonal of the Hamiltonian in precision F. Rounding H to F
