@@ -200,6 +200,12 @@ function vendor_bogoliubov_max_size end
 # kernel is faster for the smallest matrices.
 function vendor_bogoliubov_min_default_size end
 
+# Batched amplitudes A[:, :, b] = u[:, :, b]† T[:, :, b] of the first `nb`
+# wavevectors by a vendor BLAS, as `vendor_amplitudes!(A, u, T, nb)`. Methods are
+# defined by ext/KACUDAExt and ext/KAAMDGPUExt. Without one, ext/KAExt uses its
+# own kernel.
+function vendor_amplitudes! end
+
 # The steps shared by methods of `vendor_bogoliubov!`, after a vendor solver of
 # Ĩ t = λ H t, as `finish_vendor_bogoliubov!(T, E, λ, nb, status)`. Defined by
 # ext/KAExt, which documents it.

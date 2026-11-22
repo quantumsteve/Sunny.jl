@@ -12,6 +12,15 @@ potrf_batched(::Type{Float32}) = CUSOLVER.cusolverDnCpotrfBatched
 trsm_batched(::Type{Float64}) = CUBLAS.cublasZtrsmBatched_64
 trsm_batched(::Type{Float32}) = CUBLAS.cublasCtrsmBatched_64
 
+# Batched A = u† T for the first `nb` wavevectors, by cuBLAS
+function Sunny.vendor_amplitudes!(A::CuArray{Complex{F}, 3}, u::CuArray{Complex{F}, 3}, T::CuArray{Complex{F}, 3},
+                                  nb) where F <: Union{Float32, Float64}
+    bs = 1:nb
+    CUBLAS.gemm_strided_batched!('C', 'N', one(Complex{F}), view(u, :, :, bs), view(T, :, :, bs), zero(Complex{F}),
+                                 view(A, :, :, bs))
+    return
+end
+
 # Workspace in bytes of `CUSOLVER.XsyevBatched!` per n×n matrix in precision F,
 # which is roughly independent of the batch size
 function syev_workspace_per_matrix(n, F)

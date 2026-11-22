@@ -111,12 +111,23 @@ function Sunny.susceptibility_poles(swt_d::SpinWaveTheoryDevice, qpts; batch_siz
 
         # Linearized observables, and their amplitudes in each band
         observable_vectors!(backend)(u, observable_coefs, swt_d.measure, qs_global_d, Nf; ndrange=(Na, Nobs, nb))
-        amplitudes!(backend)(A, u, T; ndrange=(Nobs, n, nb))
+        amplitudes_batched!(A, u, T, nb)
         residues_batched!(measure_mode, scratch, disp, R, E, A, swt_d, qs_global, qs_global_d, iq0, Ncells; threaded)
         KA.synchronize(backend)
     end
 
     return (disp, R)
+end
+
+# Amplitudes A[μ, n, b] = ⟨0|Â_μ(q)†|n⟩ of each band n, i.e. A = u† T, for the
+# first nb wavevectors, by `Sunny.vendor_amplitudes!` if the backend has a
+# method, and otherwise by the `amplitudes!` kernel
+function amplitudes_batched!(A, u, T, nb)
+    if applicable(Sunny.vendor_amplitudes!, A, u, T, nb)
+        Sunny.vendor_amplitudes!(A, u, T, nb)
+    else
+        amplitudes!(KA.get_backend(A))(A, u, T; ndrange=(size(A, 1), size(A, 2), nb))
+    end
 end
 
 # Scratch of `residues_batched!` for nb wavevectors: the forms of the measure

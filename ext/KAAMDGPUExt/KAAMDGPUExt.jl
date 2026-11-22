@@ -14,6 +14,21 @@ Sunny.device_free_memory(::AMDGPU.ROCBackend) = AMDGPU.free()
 hegvd_strided_batched(::Type{Float64}) = rocSOLVER.rocsolver_zhegvd_strided_batched
 hegvd_strided_batched(::Type{Float32}) = rocSOLVER.rocsolver_chegvd_strided_batched
 
+# Batched matrix products of rocBLAS, per precision
+gemm_strided_batched(::Type{Float64}) = rocBLAS.rocblas_zgemm_strided_batched
+gemm_strided_batched(::Type{Float32}) = rocBLAS.rocblas_cgemm_strided_batched
+
+# Batched A = u† T for the first `nb` wavevectors, by rocBLAS. Its wrapper
+# `rocBLAS.gemm_strided_batched!` would take every matrix of the arrays,
+# so this calls the library with a count of nb.
+function Sunny.vendor_amplitudes!(A::ROCArray{Complex{F}, 3}, u::ROCArray{Complex{F}, 3}, T::ROCArray{Complex{F}, 3},
+                                  nb) where F <: Union{Float32, Float64}
+    (Nobs, n, k) = (size(A, 1), size(A, 2), size(u, 1))
+    gemm_strided_batched(F)(rocBLAS.handle(), 'C', 'N', Nobs, n, k, Ref(one(Complex{F})), u, k, k*Nobs,
+                            T, k, k*n, Ref(zero(Complex{F})), A, Nobs, Nobs*n, nb)
+    return
+end
+
 # Batched variant of `Sunny.bogoliubov!` for the first `nb` Hamiltonians of
 # `H`. rocSOLVER's hegvd solves the generalized eigenproblem Ĩ t = λ H t in one
 # call, as LAPACK's zhegvd does for `Sunny.bogoliubov!`, with eigenvalues in
